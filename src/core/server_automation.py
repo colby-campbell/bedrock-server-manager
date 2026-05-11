@@ -152,7 +152,7 @@ class ServerAutomation:
             with self.runner.lock():
                 if self.runner.is_running():
                     self.runner.stop()
-                self.backup_world_offline()
+                self._backup_world_offline()
                 self.runner.start()
 
 
@@ -193,7 +193,7 @@ class ServerAutomation:
             self.log_print(LogLevel.INFO, "No old backups to prune.")
 
 
-    def backup_world_offline(self, skip_pruning: bool = False):
+    def _backup_world_offline(self, skip_pruning: bool = False):
         """
         Perform a backup of the world when the server is offline.
         Args:
@@ -251,8 +251,7 @@ class ServerAutomation:
             return final_path
 
 
-    # TODO: set to private?
-    def backup_world_online(self, skip_pruning: bool = False):
+    def _backup_world_online(self, skip_pruning: bool = False):
         """
         Perform a backup of the world while the server remains online.
         Args:
@@ -355,7 +354,6 @@ class ServerAutomation:
                 return None
 
             # Step 4: Compress the backup directory
-            # TODO: Add a config option for compression
             final_path = dest_dir
             try:
                 # Compress the backup directory
@@ -379,9 +377,9 @@ class ServerAutomation:
         """Perform a backup of the world, choosing online or offline based on server state."""
         with self.runner.lock():
             if self.runner.is_running():
-                self.backup_world_online()
+                self._backup_world_online()
             else:
-                self.backup_world_offline()
+                self._backup_world_offline()
 
 
     def list_backups(self):
@@ -522,7 +520,7 @@ class ServerAutomation:
 
             # Make an offline backup of the current world before switching and skip pruning to avoid deleting this backup (edge case)
             self.log_print(LogLevel.INFO, "Creating offline backup of current world before switching...")
-            self.backup_world_offline(skip_pruning=True)
+            self._backup_world_offline(skip_pruning=True)
 
             # Remove the current world directory
             self.log_print(LogLevel.INFO, f"Removing current world directory '{world_dir.name}'...")
@@ -736,7 +734,7 @@ class ServerAutomation:
 
             # Backup the world and server files before updating
             self.log_print(LogLevel.INFO, "Creating offline backups of current world and server files before updating...")
-            if not (self.backup_world_offline(skip_pruning=True) and self._backup_server_files(skip_pruning=True)):
+            if not (self._backup_world_offline(skip_pruning=True) and self._backup_server_files(skip_pruning=True)):
                 self.log_print(LogLevel.ERROR, "Failed to create backups before update.")
                 return "Failed to create backups before update."
 
