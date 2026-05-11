@@ -557,7 +557,7 @@ class ServerAutomation:
         """
         Check for Bedrock server updates, uses the platform to determine the correct download type.
         """
-        updateInfo = get_bedrock_update_info(self.current_version, self.config.platform, VERSION_REGEX)
+        updateInfo = get_bedrock_update_info(self.current_version, self.config.platform)
         if updateInfo.error:
             self.log_print(LogLevel.ERROR, f"Update check failed: {updateInfo.error}")
             return "Update check failed."
@@ -694,7 +694,6 @@ class ServerAutomation:
         return True
 
 
-
     def update_server(self):
         """
         Update the Bedrock server to the latest version.
@@ -710,7 +709,7 @@ class ServerAutomation:
             return "Cannot check for updates: server version is unknown. Ensure the server has started successfully."
 
         # Check for updates and get the download URL
-        updateInfo = get_bedrock_update_info(self.current_version, self.config.platform, VERSION_REGEX)
+        updateInfo = get_bedrock_update_info(self.current_version, self.config.platform)
         if updateInfo.error:
             self.log_print(LogLevel.ERROR, f"Update check failed: {updateInfo.error}")
             return "Update check failed; cannot proceed with update."
