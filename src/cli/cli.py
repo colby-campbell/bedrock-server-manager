@@ -198,6 +198,9 @@ class CommandLineInterface:
                         self.just_print("Usage: :unmark <backup_name | latest | YYYY-MM-DD>")
                 # Switch to backup
                 elif cmd.startswith('switch'):
+                    if self.runner.is_running():
+                        self.just_print("Cannot switch world while server is running, please stop the server first.")
+                        continue
                     args = cmd.split(maxsplit=1)
                     if len(args) == 2:
                         backup_name = args[1].strip()
@@ -211,6 +214,9 @@ class CommandLineInterface:
                     self.log_print(result)
                 # Update
                 elif cmd == 'update':
+                    if self.runner.is_running():
+                        self.just_print("Cannot update the server while it is running, please stop the server first.")
+                        continue
                     self.log_print("Updating Bedrock server to the latest version...")
                     self.automation.update_server()
                 # Exit
