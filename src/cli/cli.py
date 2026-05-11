@@ -212,7 +212,7 @@ class CommandLineInterface:
                 # Update
                 elif cmd == 'update':
                     self.log_print("Updating Bedrock server to the latest version...")
-                    # self.automation.update_server()
+                    self.automation.update_server()
                 # Exit
                 elif cmd == 'exit' or cmd == 'quit':
                     # If the bot is not running or is fully started or fully stopped, allow exit

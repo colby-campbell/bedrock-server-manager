@@ -653,7 +653,7 @@ class ServerAutomation:
     
     def _extract_update_files(self, download_path, extract_path):
         """
-        Docstring for _extract_update_files
+        Extract the downloaded update files to the server folder, skipping protected paths.
         Args:
             download_path (Path): The path to the downloaded update zip file.
             extract_path (Path): The path to where the files should be extracted.
@@ -703,6 +703,13 @@ class ServerAutomation:
             _backup_server_files: to backup server files before updating.
             _extract_update_files: to extract the downloaded update files to the server folder.
         """
+        # Verify the current version is known before proceeding with an update
+        server_dir = Path(self.server_folder)
+        if self.current_version is None and server_dir.exists() and any(server_dir.iterdir()):
+            self.log_print(LogLevel.ERROR, "Cannot check for updates: server version is unknown. Ensure the server has started successfully.")
+            return "Cannot check for updates: server version is unknown. Ensure the server has started successfully."
+
+        # Check for updates and get the download URL
         updateInfo = get_bedrock_update_info(self.current_version, self.config.platform, VERSION_REGEX)
         if updateInfo.error:
             self.log_print(LogLevel.ERROR, f"Update check failed: {updateInfo.error}")
@@ -718,7 +725,7 @@ class ServerAutomation:
             
             self.log_print(LogLevel.INFO, f"Updating server from version {self.current_version} to {updateInfo.latest_version}...")
 
-            # Prepare paths to download the backup
+            # Prepare paths to update the backup
             temp_dir = Path(f"{TEMPORARY_BACKUP_PREFIX}_bedrock_update")
             download_path = temp_dir / "update.zip"
 
@@ -744,8 +751,9 @@ class ServerAutomation:
 
             # Backup the world and server files before updating
             self.log_print(LogLevel.INFO, "Creating offline backups of current world and server files before updating...")
-            self.backup_world_offline(skip_pruning=True)
-            self._backup_server_files(skip_pruning=True)
+            if not (self.backup_world_offline(skip_pruning=True) and self._backup_server_files(skip_pruning=True)):
+                self.log_print(LogLevel.ERROR, "Failed to create backups before update.")
+                return "Failed to create backups before update."
 
             # Extract the downloaded files to the server folder (overwrite existing files)
             extract_path = temp_dir / "extracted"
