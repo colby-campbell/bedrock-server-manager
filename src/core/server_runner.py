@@ -125,6 +125,11 @@ class ServerRunner:
             # Format then broadcast the timestamp and line
             timestamp, message = process_line(line.rstrip())
             self.stdout_broadcaster.publish(timestamp, message)
+            # Detect if the line is a missing server.properties error
+            if "Error opening file: server.properties" in line:
+                self.stdout_broadcaster.publish(get_prefix(LogLevel.CRITICAL), "The server failed to start due to a missing server.properties file. Please ensure that server.properties exists in the server folder and is properly configured.")
+                self.send_command("")           # Since the server is looking for an input to continue, send an empty string to prevent it from hanging
+                self._expected_shutdown = True  # Prevent the unexpected shutdown message since we know why it happened
         self.process.stdout.close()
         # Clean up runner state after process exits
         self.process = None

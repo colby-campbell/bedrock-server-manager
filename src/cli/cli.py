@@ -245,7 +245,7 @@ class CommandLineInterface:
                     self.just_print("You are passing input for the bedrock server itself, if you want to see the CLI built-in commands, type ':help'.")
                     self.runner.send_command("help")
                 # Otherwise send it as normal server input
-                elif words and self.runner.is_running():
+                elif self.runner.is_running():
                     self.runner.send_command(input_text)
                 else:
                     self.just_print("Server is not running, start the server to send commands.")
