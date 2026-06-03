@@ -708,7 +708,7 @@ class ServerAutomation:
         """
         # Verify the current version is known before proceeding with an update
         server_dir = Path(self.server_folder)
-        if self.current_version is None and server_dir.exists() and any(server_dir.iterdir()):
+        if self.current_version is None:
             self.log_print(LogLevel.ERROR, "Cannot check for updates: server version is unknown. Ensure the server has started successfully.")
             return "Cannot check for updates: server version is unknown. Ensure the server has started successfully."
 
