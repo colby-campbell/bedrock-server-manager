@@ -41,54 +41,59 @@ if __name__ == "__main__":
     # Register cleanup with atexit for normal and exception-based exits
     atexit.register(cleanup)
 
-    # Get config info, create server runner and automation instances, and create the discord bot
     try:
-        config = ServerConfig()
-    except SettingsFileMissing as e:
-        output_handler.add_error(str(e), "config")
-        sys.exit(0)
-    except ServerConfigError as e:
-        output_handler.add_error(str(e), "config")
-        sys.exit(1)
-    
-    # Auto-download server files on fresh install
-    executable_name = "bedrock_server" if config.platform == Platform.Linux else "bedrock_server.exe"
-    if not os.path.isfile(os.path.join(config.server_folder, executable_name)):
-        folder_is_empty = not any(Path(config.server_folder).iterdir())
-        if not folder_is_empty:
-            output_handler.add_error(
-                f"server executable not found in '{config.server_folder}'; "
-                f"if this is a fresh install, ensure the server folder is empty",
-                "main"
-            )
-            sys.exit(1)
-        print("bedrock-server:\n  main:\n    server files not found, downloading and extracting Bedrock server software...")
+        # Get config info, create server runner and automation instances, and create the discord bot
         try:
-            download_and_extract_bedrock(config.platform, config.server_folder)
-            print()
-        except RuntimeError as e:
-            output_handler.add_error(str(e), "downloader")
+            config = ServerConfig()
+        except SettingsFileMissing as e:
+            output_handler.add_error(str(e), "config")
+            sys.exit(0)
+        except ServerConfigError as e:
+            output_handler.add_error(str(e), "config")
             sys.exit(1)
 
-    # Create the server runner and automation instances
-    runner = ServerRunner(config)
-    automation = ServerAutomation(config, runner)
+        # Auto-download server files on fresh install
+        executable_name = "bedrock_server" if config.platform == Platform.Linux else "bedrock_server.exe"
+        if not os.path.isfile(os.path.join(config.server_folder, executable_name)):
+            folder_is_empty = not any(Path(config.server_folder).iterdir())
+            if not folder_is_empty:
+                output_handler.add_error(
+                    f"server executable not found in '{config.server_folder}'; "
+                    f"if this is a fresh install, ensure the server folder is empty",
+                    "main"
+                )
+                sys.exit(1)
+            print("bedrock-server:\n  main:\n    server files not found, downloading and extracting Bedrock server software...")
+            try:
+                download_and_extract_bedrock(config.platform, config.server_folder)
+                print()
+            except RuntimeError as e:
+                output_handler.add_error(str(e), "downloader")
+                sys.exit(1)
 
-    # Start the Discord bot if enabled in the config
-    if config.discord_bot:
-        bot = DiscordBot(config, runner, automation)
-        # Start the discord bot in a separate thread
-        bot_thread = threading.Thread(target=bot.discord_bot_start, daemon=True)
-        bot_thread.start()
+        # Create the server runner and automation instances
+        runner = ServerRunner(config)
+        automation = ServerAutomation(config, runner)
 
-    # Create the command-line interface instance
-    cli = CommandLineInterface(config, runner, automation, bot)
+        # Start the Discord bot if enabled in the config
+        if config.discord_bot:
+            bot = DiscordBot(config, runner, automation)
+            # Start the discord bot in a separate thread
+            bot_thread = threading.Thread(target=bot.discord_bot_start, daemon=True)
+            bot_thread.start()
 
-    # Start the server and CLI
-    try:
-        runner.start()
-    except (FileNotFoundError, RuntimeError) as e:
-        output_handler.add_error(str(e), "runner")
-        sys.exit(1)
-    automation.start()
-    cli.start()
+        # Create the command-line interface instance
+        cli = CommandLineInterface(config, runner, automation, bot)
+
+        # Start the server and CLI
+        try:
+            runner.start()
+        except (FileNotFoundError, RuntimeError) as e:
+            output_handler.add_error(str(e), "runner")
+            sys.exit(1)
+        automation.start()
+        cli.start()
+
+    except KeyboardInterrupt:
+        output_handler.add_message("keyboard interrupt received, shutting down...", "main")
+        sys.exit(0)
