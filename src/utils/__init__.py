@@ -5,7 +5,7 @@ from .broadcaster import LineBroadcaster, SignalBroadcaster
 from .platform import Platform
 from .bedrock_download_link_fetcher import UpdateInfo, get_bedrock_update_info
 from .windows_job import create_job_object, close_job_object
-from .output import HandleServerOutput
+from .output import ServerOutput
 
 __all__ = [
     'BroadcastHandler',
@@ -22,5 +22,5 @@ __all__ = [
     'get_bedrock_update_info',
     'create_job_object',
     'close_job_object',
-    'HandleServerOutput'
+    'ServerOutput'
 ]

@@ -6,7 +6,7 @@ from core import ServerRunner
 from core import ServerAutomation
 from bot import DiscordBot
 from cli import CommandLineInterface
-from utils import HandleServerOutput
+from utils import ServerOutput
 import threading
 import atexit
 
@@ -15,7 +15,7 @@ runner = None
 automation = None
 bot = None
 cli = None
-output_handler = HandleServerOutput()
+output_handler = ServerOutput()
 
 
 def cleanup():
