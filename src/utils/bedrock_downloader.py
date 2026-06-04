@@ -38,22 +38,26 @@ def download_and_extract_bedrock(platform, server_folder):
                 total = int(resp.headers.get('Content-Length', 0))
                 downloaded = 0
                 show_bar = sys.stdout.isatty()
+                last_percent = -1
+                last_logged = 0
                 for chunk in resp.iter_content(chunk_size=DOWNLOAD_CHUNK_SIZE):
                     if chunk:
                         f.write(chunk)
                         downloaded += len(chunk)
                         if total:
                             percent = downloaded * 100 // total
+                            if percent == last_percent:
+                                continue
+                            last_percent = percent
                             mb_down = downloaded / (1024 * 1024)
                             mb_total = total / (1024 * 1024)
                             if show_bar:
                                 filled = int(40 * percent / 100)
                                 bar = "#" * filled + "-" * (40 - filled)
-                                sys.stdout.write(f"\r  [{bar}] {percent:5.1f}%  {mb_down:.1f}/{mb_total:.1f} MB")
+                                sys.stdout.write(f"\r    [{bar}] {percent:3d}%  {mb_down:.1f}/{mb_total:.1f} MB")
                                 sys.stdout.flush()
-                            # Log progress every 25% if not showing the progress bar
                             elif percent // 25 > last_logged // 25:
-                                print(f"Downloading: {percent}% ({mb_down:.1f}/{mb_total:.1f} MB)")
+                                print(f"{percent}% ({mb_down:.1f}/{mb_total:.1f} MB)")
                                 last_logged = percent
                 if show_bar:
                     print()
@@ -75,17 +79,21 @@ def download_and_extract_bedrock(platform, server_folder):
         server_dir = Path(server_folder)
         with zipfile.ZipFile(download_path, 'r') as zf:
             files = zf.infolist()
+            last_percent = -1
+            last_logged = 0
             for i, file in enumerate(files):
                 zf.extract(file, server_dir)
                 percent = (i + 1) * 100 // len(files)
+                if percent == last_percent:
+                    continue
+                last_percent = percent
                 if show_bar:
                     filled = int(40 * percent / 100)
                     bar = "#" * filled + "-" * (40 - filled)
-                    sys.stdout.write(f"\r  [{bar}] {percent:5.1f}%  {i + 1}/{len(files)} files")
+                    sys.stdout.write(f"\r    [{bar}] {percent:3d}%  {i + 1}/{len(files)} files")
                     sys.stdout.flush()
-                # Log progress every 25% if not showing the progress bar
                 elif percent // 25 > last_logged // 25:
-                    print(f"Extracting: {percent}% ({i + 1}/{len(files)} files)")
+                    print(f"{percent}% ({i + 1}/{len(files)} files)")
                     last_logged = percent
         if show_bar:
             print()

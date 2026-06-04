@@ -1,4 +1,6 @@
 import sys
+import os
+from pathlib import Path
 from core import ServerConfig
 from core import ServerConfigError
 from core import SettingsFileMissing
@@ -6,7 +8,8 @@ from core import ServerRunner
 from core import ServerAutomation
 from bot import DiscordBot
 from cli import CommandLineInterface
-from utils import ServerOutput
+from utils import ServerOutput, Platform
+from utils.bedrock_downloader import download_and_extract_bedrock
 import threading
 import atexit
 
@@ -47,6 +50,25 @@ if __name__ == "__main__":
     except ServerConfigError as e:
         output_handler.add_error(str(e), "config")
         sys.exit(1)
+    
+    # Auto-download server files on fresh install
+    executable_name = "bedrock_server" if config.platform == Platform.Linux else "bedrock_server.exe"
+    if not os.path.isfile(os.path.join(config.server_folder, executable_name)):
+        folder_is_empty = not any(Path(config.server_folder).iterdir())
+        if not folder_is_empty:
+            output_handler.add_error(
+                f"server executable not found in '{config.server_folder}'; "
+                f"if this is a fresh install, ensure the server folder is empty",
+                "main"
+            )
+            sys.exit(1)
+        print("bedrock-server:\n  main:\n    server files not found, downloading and extracting Bedrock server software...")
+        try:
+            download_and_extract_bedrock(config.platform, config.server_folder)
+            print()
+        except RuntimeError as e:
+            output_handler.add_error(str(e), "downloader")
+            sys.exit(1)
 
     # Create the server runner and automation instances
     runner = ServerRunner(config)
