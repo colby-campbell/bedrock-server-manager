@@ -1,6 +1,5 @@
 import tomllib
 import os
-import sys
 import re
 import platform
 from enum import Enum
@@ -12,6 +11,14 @@ SETTINGS_FILE = "settings.toml"
 SERVER_PROPERTIES_FILE = "server.properties"
 LEVEL_NAME_KEY = "level-name"
 DEFAULT_WORLD_NAME = "Bedrock level"
+
+
+class ServerConfigError(Exception):
+    """Raised when the configuration file exists but is invalid."""
+
+
+class SettingsFileMissing(Exception):
+    """Raised when the settings file is missing and a sample was created."""
 
 
 class ServerConfig:
@@ -108,22 +115,21 @@ class ServerConfig:
         """
         Initialize ServerConfig by loading and validating the config file.
         Raises:
-            SystemExit: If the config file is missing or contains invalid settings.
+            SettingsFileMissing: If the settings file is missing and a sample was created.
+            ServerConfigError: If the config file exists but is invalid.
         """
         # Make sure a config file exists
         if not os.path.exists(SETTINGS_FILE):
             with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
                 f.write(self.SAMPLE_TOML)
-            print(f"bedrock-server: {SETTINGS_FILE}: not found, sample created; edit it and rerun")
-            sys.exit(1)
+            raise SettingsFileMissing(f"{SETTINGS_FILE}: not found, sample created; edit it and rerun")
 
         # Load the config file
         with open(SETTINGS_FILE, "rb") as f:
             try:
                 cfg = tomllib.load(f)
             except tomllib.TOMLDecodeError as e:
-                print(f"bedrock-server: {SETTINGS_FILE}: invalid TOML format: {e}")
-                sys.exit(1)
+                raise ServerConfigError(f"{SETTINGS_FILE}: invalid TOML format: {e}") from e
 
         # TODO: Add default values for optional settings?
         # Load the config settings
@@ -157,8 +163,7 @@ class ServerConfig:
         # Validate the config file settings
         errors = self._validate()
         if errors:
-            print("bedrock-server:\n  " + "\n  ".join(errors))
-            sys.exit(1)
+            raise ServerConfigError("\n".join(errors))
 
     def _get_world_name_from_properties(self, properties_path):
         """
