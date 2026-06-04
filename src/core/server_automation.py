@@ -14,8 +14,8 @@ RESTART_WARNING_MINUTES = 5
 CRASH_DETECTION_WINDOW_MINUTES = 10
 OFFLINE_BACKUP_PREFIX = "offline_world_backup"  # eg. "offline_world_backup_YYYY-MM-DD_HH-MM-SS"
 ONLINE_BACKUP_PREFIX = "online_world_backup"    # eg. "online_world_backup_YYYY-MM-DD_HH-MM-SS"
-TEMPORARY_BACKUP_PREFIX = ".tmp"                # eg. ".tmp_offline_world_backup_YYYY-MM-DD_HH-MM-SS"
 PROTECTED_BACKUP_PREFIX = "protected"           # eg. "protected_offline_world_backup_YYYY-MM-DD_HH-MM-SS"
+TEMPORARY_PREFIX = ".tmp"                       # eg. ".tmp_offline_world_backup_YYYY-MM-DD_HH-MM-SS"
 BACKUP_TIMESTAMP_FORMAT = "%Y-%m-%d_%H-%M-%S"
 DEQUE_MAX_LENGTH = 100
 SUCCESS_PATTERN = r"Data saved. Files are now ready to be copied."
@@ -174,7 +174,7 @@ class ServerAutomation:
                 continue
             if backup_time < cutoff_time:
                 # Skip protected backups, temporary backups, and only delete valid backups
-                if backup.name.startswith(PROTECTED_BACKUP_PREFIX) or backup.name.startswith(TEMPORARY_BACKUP_PREFIX):
+                if backup.name.startswith(PROTECTED_BACKUP_PREFIX) or backup.name.startswith(TEMPORARY_PREFIX):
                     continue
                 elif not (backup.name.startswith(OFFLINE_BACKUP_PREFIX) or backup.name.startswith(ONLINE_BACKUP_PREFIX)):
                     continue
@@ -213,7 +213,7 @@ class ServerAutomation:
 
             timestamp = strftime(BACKUP_TIMESTAMP_FORMAT)
             dest_dir = backup_root / f"{OFFLINE_BACKUP_PREFIX}_{timestamp}"
-            temp_dir = backup_root / f"{TEMPORARY_BACKUP_PREFIX}_{OFFLINE_BACKUP_PREFIX}_{timestamp}"
+            temp_dir = backup_root / f"{TEMPORARY_PREFIX}_{OFFLINE_BACKUP_PREFIX}_{timestamp}"
 
             self.log_print(LogLevel.INFO, f"Initiating offline backup to '{dest_dir.name}'")
 
@@ -271,7 +271,7 @@ class ServerAutomation:
 
             timestamp = strftime(BACKUP_TIMESTAMP_FORMAT)
             dest_dir = backup_root / f"{ONLINE_BACKUP_PREFIX}_{timestamp}"
-            temp_dir = backup_root / f"{TEMPORARY_BACKUP_PREFIX}_{ONLINE_BACKUP_PREFIX}_{timestamp}"
+            temp_dir = backup_root / f"{TEMPORARY_PREFIX}_{ONLINE_BACKUP_PREFIX}_{timestamp}"
 
             self.log_print(LogLevel.INFO, f"Initiating online backup to '{dest_dir.name}'; expect ERROR messages indicating a previous save has not been completed.")
 
@@ -588,7 +588,7 @@ class ServerAutomation:
 
             timestamp = strftime(BACKUP_TIMESTAMP_FORMAT)
             dest_dir = backup_root / f"{SERVER_BACKUP_PREFIX}_{timestamp}"
-            temp_dir = backup_root / f"{TEMPORARY_BACKUP_PREFIX}_{SERVER_BACKUP_PREFIX}_{timestamp}"
+            temp_dir = backup_root / f"{TEMPORARY_PREFIX}_{SERVER_BACKUP_PREFIX}_{timestamp}"
             
             self.log_print(LogLevel.INFO, f"Backing up server files to '{dest_dir.name}'")
 
@@ -728,15 +728,15 @@ class ServerAutomation:
             
             self.log_print(LogLevel.INFO, f"Updating server from version {self.current_version} to {updateInfo.latest_version}...")
 
-            # Prepare paths to update the backup
-            temp_dir = Path(f"{TEMPORARY_BACKUP_PREFIX}_bedrock_update")
-            download_path = temp_dir / "update.zip"
-
             # Backup the world and server files before updating
             self.log_print(LogLevel.INFO, "Creating offline backups of current world and server files before updating...")
             if not (self._backup_world_offline(skip_pruning=True) and self._backup_server_files(skip_pruning=True)):
                 self.log_print(LogLevel.ERROR, "Failed to create backups before update.")
                 return "Failed to create backups before update."
+
+            # Prepare paths to update the bedrock server
+            temp_dir = Path(f"{TEMPORARY_PREFIX}_bedrock_update")
+            download_path = temp_dir / "update.zip"
 
             # Download the new server files
             self.log_print(LogLevel.INFO, f"Downloading update from {updateInfo.download_url}...")
