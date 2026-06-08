@@ -23,6 +23,14 @@ class Broadcaster:
         # Sort subscribers based on priority
         self.subscribers.sort(key=lambda x: priority.value)
 
+    def unsubscribe(self, callback):
+        """
+        Remove a subscriber from the subscriber list.
+        Args:
+            callback (func): Function to remove from the subscribe list.
+        """
+        self.subscribers.remove(callback)
+
 class LineBroadcaster(Broadcaster):
     def publish(self, timestamp, line):
         """

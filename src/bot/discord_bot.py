@@ -88,7 +88,41 @@ class DiscordBot:
         @commands.is_owner()
         @self.bot.command(name="cmd")
         async def discord_cmd(ctx):
-            print("Command-line access invoked")
+            queue = asyncio.Queue()
+
+            def on_server_output(_timestamp, line):
+                queue.put_nowait(line)
+
+            self.server.stdout_broadcaster.subscribe(on_server_output)
+            await ctx.send("Entered cmd mode. Type `exit` to quit. Times out after 60s of inactivity.")
+
+            async def flush_queue():
+                lines = []
+                try:
+                    while True:
+                        line = await asyncio.wait_for(queue.get(), timeout=0.5)
+                        lines.append(line)
+                except asyncio.TimeoutError:
+                    pass
+                if lines:
+                    await ctx.send(f"```{''.join(lines)}```")
+
+            try:
+                while True:
+                    msg = await self.bot.wait_for(
+                        'message',
+                        check=lambda m: m.author == ctx.author and m.channel == ctx.channel,
+                        timeout=60.0
+                    )
+                    if msg.content.lower() == "exit":
+                        await ctx.send("Exiting cmd mode.")
+                        break
+                    self.server.send_command(msg.content)
+                    await flush_queue()
+            except asyncio.TimeoutError:
+                await ctx.send("cmd mode timed out due to inactivity.")
+            finally:
+                self.server.stdout_broadcaster.unsubscribe(on_server_output)
 
         # Admin commands
         @is_admin(self.admin_list)
@@ -168,4 +202,5 @@ class DiscordBot:
     def discord_bot_stop(self):
         """Stop the Discord bot."""
         # To shut down properly, schedule the close coroutine on the event loop
+        # This isn't really necessary since the bot will shut down when the main process exits, but hey shi idk gang
         asyncio.run_coroutine_threadsafe(self.bot.close(), self.bot.loop)
