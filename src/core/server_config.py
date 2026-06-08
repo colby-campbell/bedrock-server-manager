@@ -12,20 +12,16 @@ SERVER_PROPERTIES_FILE = "server.properties"
 LEVEL_NAME_KEY = "level-name"
 DEFAULT_WORLD_NAME = "Bedrock level"
 DEFAULT_DISCORD_COMMANDS = [
-    "cmd",
-    "start",
-    "stop",
-    "restart",
-    "backup",
-    "list",
-    "mark",
-    "unmark",
-    "switch",
-    "check",
-    "update",
-    "help",
-    "online"
+    "cmd", "start", "stop", "restart", "backup",
+    "list", "mark", "unmark", "switch", "check",
+    "update", "help", "online"
 ]
+ROOT_LEVEL_KEYS = {
+    "server_folder", "log_folder", "backup_folder", "backup_duration",
+    "shutdown_timeout", "crash_limit", "restart_time", "discord_bot",
+    "bot_token", "admin_list", "auto_update", "update_protected_paths",
+    "update_backup_paths", "platform", "world_name"
+}
 
 
 class ServerConfigError(Exception):
@@ -49,10 +45,10 @@ class ServerConfig:
         LIST_OF_INTEGERS = 4
         LIST_OF_STRINGS = 5
         LIST_OF_STRINGS_OR_ALL = 6
-        LIST_OF_COMMANDS = 7
-        FOLDER = 8
-        TIME = 9
-        PLATFORM = 10
+        FOLDER = 7
+        TIME = 8
+        PLATFORM = 9
+        CURRENT_TABLE = 10
 
     class SettingContainer:
         """Container for a setting value, its name, and type."""
@@ -92,6 +88,29 @@ class ServerConfig:
     # Time to restart the server daily in HH:MM (24-hour) format.
     # Allowed Values: "HH:MM" where HH is 00-23 and MM is 00-59
 
+    auto_update=true
+    # Whether to enable automatic updates (recommended).
+    # Allowed Values: true, false
+
+    update_protected_paths=["server.properties", "allowlist.json", "permissions.json", "profanity_filter.wlist"]
+    # List of server files/folders to protect from being overwritten during an update (worlds are always protected).
+    # Allowed Values: [string, string, ...]
+
+    update_backup_paths=["server.properties", "allowlist.json", "permissions.json", "profanity_filter.wlist"]
+    # List of server files/folders to back up before performing an update, must be relative to the server folder (worlds are always backed up).
+    # Allowed Values: [string, string, ...] | all
+
+    # platform (optional)
+    # If not set, this is auto-detected.
+    # Set manually only if auto-detection fails.
+    #platform=
+    # Allowed Values: "Windows", "Linux"
+
+    # world_name (optional)
+    # If not set, this is auto-detected from 'f{LEVEL_NAME_KEY}' in {SERVER_PROPERTIES_FILE}.
+    # Set manually only if auto-detection fails.
+    #world_name=
+
     discord_bot=false
     # Whether to enable the Discord bot.
     # Allowed Values: true, false
@@ -106,6 +125,11 @@ class ServerConfig:
     # Allowed Values: [integer, integer, ...]
     # Required only if discord_bot=true
 
+    # custom_commands (optional)
+    # List of custom commands to be added to the Discord bot, each with a name, command, admin requirement, and description.
+    # Allowed Values: [[name=string, command=string, admin=boolean, description=string], ...]
+    # Must be placed at the end of the file due to TOML array-of-tables rules.
+    
     [[custom_commands]]
     name = "coordson"
     command = "gamerule showcoordinates true"
@@ -117,32 +141,6 @@ class ServerConfig:
     command = "gamerule showcoordinates false"
     admin = true
     description = "Disable show coordinates."
-    # custom_commands (optional)
-    # List of custom commands to be added to the Discord bot, each with a name, command, admin requirement, and description.
-    # Allowed Values: [[name=string, command=string, admin=boolean, description=string], ...]
-
-    auto_update=true
-    # Whether to enable automatic updates (recommended).
-    # Allowed Values: true, false
-
-    update_protected_paths=["server.properties", "allowlist.json", "permissions.json", "server.properties", "profanity_filter.wlist"]
-    # List of server files/folders to protect from being overwritten during an update (worlds are always protected).
-    # Allowed Values: [string, string, ...]
-
-    update_backup_paths=["server.properties", "allowlist.json", "permissions.json", "server.properties", "profanity_filter.wlist"]
-    # List of server files/folders to back up before performing an update, must be relative to the server folder (worlds are always backed up).
-    # Allowed Values: [string, string, ...] | all
-
-    # platform (optional)
-    # If not set, this is auto-detected.
-    # Set manually only if auto-detection fails.
-    #platform=
-    # Allowed Values: "Windows", "Linux"
-
-    # world_name (optional)
-    # If not set, this is auto-detected from 'f{LEVEL_NAME_KEY}' in {SERVER_PROPERTIES_FILE}.
-    # Set manually only if auto-detection fails.
-    #world_name=
     """
 
     def __init__(self):
@@ -165,7 +163,6 @@ class ServerConfig:
             except tomllib.TOMLDecodeError as e:
                 raise ServerConfigError(f"{SETTINGS_FILE}: invalid TOML format: {e}") from e
 
-        # TODO: Add default values for optional settings?
         # Load the config settings
         self.server_folder = cfg.get("server_folder")
         self.log_folder = cfg.get("log_folder")
@@ -174,13 +171,13 @@ class ServerConfig:
         self.shutdown_timeout = cfg.get("shutdown_timeout")
         self.crash_limit = cfg.get("crash_limit")
         self.restart_time = cfg.get("restart_time")
+        self.auto_update = cfg.get("auto_update")
+        self.update_protected_paths = cfg.get("update_protected_paths")
+        self.update_backup_paths = cfg.get("update_backup_paths")
         self.discord_bot = cfg.get("discord_bot")
         self.bot_token = cfg.get("bot_token")
         self.admins = cfg.get("admin_list")
         self.custom_commands = cfg.get("custom_commands", [])
-        self.auto_update = cfg.get("auto_update")
-        self.update_protected_paths = cfg.get("update_protected_paths")
-        self.update_backup_paths = cfg.get("update_backup_paths")
 
         # Determine the platform if not set
         detected_platform = platform.system()
@@ -235,18 +232,27 @@ class ServerConfig:
             self.SettingContainer(self.shutdown_timeout, "shutdown_timeout", self.SettingType.INTEGER),
             self.SettingContainer(self.crash_limit, "crash_limit", self.SettingType.INTEGER),
             self.SettingContainer(self.restart_time, "restart_time", self.SettingType.TIME),
-            self.SettingContainer(self.discord_bot, "discord_bot", self.SettingType.BOOLEAN),
-            self.SettingContainer(self.bot_token, "bot_token", self.SettingType.STRING) if self.discord_bot else None,
-            self.SettingContainer(self.admins, "admin_list", self.SettingType.LIST_OF_INTEGERS) if self.discord_bot else None,
-            self.SettingContainer(self.custom_commands, "custom_commands", self.SettingType.LIST_OF_COMMANDS) if self.discord_bot else None,
             self.SettingContainer(self.auto_update, "auto_update", self.SettingType.BOOLEAN),
             self.SettingContainer(self.platform, "platform", self.SettingType.PLATFORM),
             self.SettingContainer(self.world_name, "world_name", self.SettingType.STRING),
             self.SettingContainer(self.update_protected_paths, "update_protected_paths", self.SettingType.LIST_OF_STRINGS),
-            self.SettingContainer(self.update_backup_paths, "update_backup_paths", self.SettingType.LIST_OF_STRINGS_OR_ALL)
+            self.SettingContainer(self.update_backup_paths, "update_backup_paths", self.SettingType.LIST_OF_STRINGS_OR_ALL),
+            self.SettingContainer(self.discord_bot, "discord_bot", self.SettingType.BOOLEAN),
+            self.SettingContainer(self.bot_token, "bot_token", self.SettingType.STRING) if self.discord_bot else None,
+            self.SettingContainer(self.admins, "admin_list", self.SettingType.LIST_OF_INTEGERS) if self.discord_bot else None,
+            self.SettingContainer(self.custom_commands, "custom_commands", self.SettingType.CURRENT_TABLE) if self.discord_bot else None
         )
 
         errors = []
+
+        # Before validating individual settings, check for any ROOT_LEVEL_KEYS that are incorrectly placed in custom_commands blocks
+        misplaced = set()
+        # If any of the ROOT_LEVEL_KEYS are found in the custom_commands entry
+        for entry in self.custom_commands:
+            misplaced.update(ROOT_LEVEL_KEYS & set(entry.keys()))
+        if misplaced:
+            errors.append("custom_commands: move all [[custom_commands]] blocks to the end of the file; settings found in [[custom_commands]] blocks")
+
         for container in CHECK_VARIABLES:
             # Skip None containers (conditional settings)
             if container is None:
@@ -254,9 +260,12 @@ class ServerConfig:
             value = container.setting_value
             name = container.setting_name
             stype = container.setting_type
-            # Check for missing values
+            # Check for missing values or values that are misplaced in custom_commands blocks
             if value is None:
-                errors.append(f"{name}: missing (required)")
+                if name in misplaced:
+                    errors.append(f"{name}: found in [[custom_commands]] block; move to root level")
+                else:
+                    errors.append(f"{name}: missing (required)")
                 continue
             # Validate based on type
             match stype:
@@ -286,7 +295,29 @@ class ServerConfig:
                         errors.append(f"{name}: all items must be strings")
                     elif isinstance(value, str) and value.lower() != "all":
                         errors.append(f"{name}: if a string, must be 'all'")
-                case self.SettingType.LIST_OF_COMMANDS:
+                case self.SettingType.FOLDER:
+                    if not isinstance(value, str):
+                        errors.append(f"{name}: must be a string representing a folder path")
+                    elif not os.path.exists(value):
+                        os.mkdir(value)
+                case self.SettingType.TIME:
+                    if not isinstance(value, str):
+                        errors.append(f"{name}: must be a string in HH:MM format")
+                    else:
+                        try:
+                            pattern = r'^([01]?[0-9]|2[0-3]):([0-5][0-9])$'
+                            match = re.match(pattern, value)
+                            if not match:
+                                errors.append(f"{name}: {value}: invalid time")
+                            else:
+                                # Store as [hour, minute]
+                                setattr(self, name, [int(match.group(1)), int(match.group(2))])
+                        except ValueError:
+                            errors.append(f"{name}: {value}: cannot contain non-integer numbers")
+                case self.SettingType.PLATFORM:
+                    if not isinstance(value, Platform):
+                        errors.append(f"{name}: must be either 'Windows' or 'Linux'")
+                case self.SettingType.CURRENT_TABLE:
                     if not isinstance(value, list):
                         errors.append(f"{name}: must be a list of commands")
                     else:
@@ -316,27 +347,5 @@ class ServerConfig:
                                 errors.append(f"{name}[{i}]['admin']: must be a boolean")
                             if not isinstance(cmd["description"], str):
                                 errors.append(f"{name}[{i}]['description']: must be a string")
-                case self.SettingType.FOLDER:
-                    if not isinstance(value, str):
-                        errors.append(f"{name}: must be a string representing a folder path")
-                    elif not os.path.exists(value):
-                        os.mkdir(value)
-                case self.SettingType.TIME:
-                    if not isinstance(value, str):
-                        errors.append(f"{name}: must be a string in HH:MM format")
-                    else:
-                        try:
-                            pattern = r'^([01]?[0-9]|2[0-3]):([0-5][0-9])$'
-                            match = re.match(pattern, value)
-                            if not match:
-                                errors.append(f"{name}: {value}: invalid time")
-                            else:
-                                # Store as [hour, minute]
-                                setattr(self, name, [int(match.group(1)), int(match.group(2))])
-                        except ValueError:
-                            errors.append(f"{name}: {value}: cannot contain non-integer numbers")
-                case self.SettingType.PLATFORM:
-                    if not isinstance(value, Platform):
-                        errors.append(f"{name}: must be either 'Windows' or 'Linux'")
         
         return errors
