@@ -30,6 +30,7 @@ class DiscordBot:
         """
         self.admin_list = config.admins
         self.token = config.bot_token
+        self.custom_commands = config.custom_commands
         self.server = server
         self.automation = automation
         self.broadcaster = LineBroadcaster()
@@ -55,35 +56,31 @@ class DiscordBot:
             embed.add_field(
                 name="Bot Owner Commands",
                 value="\n".join([
-                    "`!cmd` — Allows access to the command-line of the internal Minecraft Bedrock server."
+                    "`!cmd` - Allows access to the command-line of the internal Minecraft Bedrock server."
                 ])
             )
 
-            embed.add_field(
-                name="Admin Commands",
-                value="\n".join([
-                    "`!start` - Start the Minecraft Bedrock server.",
-                    "`!stop` - Stop the server.",
-                    "`!restart` - Restart the server.",
-                    "`!backup` - Create a world backup.",
-                    "`!list` - List existing backups.",
-                    "`!mark <backup_name | latest | YYYY-MM-DD>` - Protect backup(s) from automatic deletion.",
-                    "`!unmark <backup_name | latest | YYYY-MM-DD>` - Unprotect backup(s) from automatic deletion.",
-                    "`!switch <backup_name> - Switch the world to the specified backup.",
-                    "`!check` - Check for Bedrock server updates.",
-                    "`!update` - Update the Bedrock server to the latest version.",
-                ]),
-                inline=False
-            )
+            admin_lines = [
+                "`!start` - Start the Minecraft Bedrock server.",
+                "`!stop` - Stop the server.",
+                "`!restart` - Restart the server.",
+                "`!backup` - Create a world backup.",
+                "`!list` - List existing backups.",
+                "`!mark <backup_name | latest | YYYY-MM-DD>` - Protect backup(s) from automatic deletion.",
+                "`!unmark <backup_name | latest | YYYY-MM-DD>` - Unprotect backup(s) from automatic deletion.",
+                "`!switch <backup_name>` - Switch the world to the specified backup.",
+                "`!check` - Check for Bedrock server updates.",
+                "`!update` - Update the Bedrock server to the latest version.",
+                *[f"`!{c['name']}` - {c['description']}" for c in self.custom_commands if c["admin"]]
+            ]
+            embed.add_field(name="Admin Commands", value="\n".join(admin_lines), inline=False)
 
-            embed.add_field(
-                name="General Commands",
-                value="\n".join([
-                    "`!help` — Show this message.",
-                    "`!online` — Show who is online."
-                ]),
-                inline=False
-            )
+            general_lines = [
+                "`!help` - Show this message.",
+                "`!online` - Show who is online.",
+                *[f"`!{c['name']}` - {c['description']}" for c in self.custom_commands if not c["admin"]]
+            ]
+            embed.add_field(name="General Commands", value="\n".join(general_lines), inline=False)
 
             await ctx.send(embed=embed)
 
@@ -153,6 +150,17 @@ class DiscordBot:
         async def on_command_error(ctx, error):
             if isinstance(error, commands.errors.CheckFailure):
                 await ctx.send("You do not have the permissions to use this command.")
+
+        # Register custom commands from config
+        for entry in self.custom_commands:
+            def make_handler(cmd_str):
+                async def handler(_ctx):
+                    self.server.send_command(cmd_str)
+                return handler
+            cmd = commands.Command(make_handler(entry["command"]), name=entry["name"], help=entry["description"])
+            if entry["admin"]:
+                cmd.add_check(is_admin(self.admin_list).predicate)
+            self.bot.add_command(cmd)
 
         # Start the discord bot with custom logging
         self.bot.run(self.token, log_handler=self.broadcast_handler, log_formatter=self.log_formatter)
