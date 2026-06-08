@@ -55,20 +55,23 @@ class DiscordBot:
             embed.add_field(
                 name="Bot Owner Commands",
                 value="\n".join([
-                    "`!god` — Allows access to the command-line of the server software."
+                    "`!cmd` — Allows access to the command-line of the internal Minecraft Bedrock server."
                 ])
             )
 
             embed.add_field(
                 name="Admin Commands",
                 value="\n".join([
-                    "`!stop` — Stop the server.",
-                    "`!start` — Start the server.",
-                    "`!restart` — Restart the server.",
-                    "`!save` — Save the world while the server is still running.",
-                    "`!check_for_update` — Checks for an update for the server software."
-                    "`!difficulty` — Set the difficulty.",
-                    "`!coords` — Set coordinates.",
+                    "`!start` - Start the Minecraft Bedrock server.",
+                    "`!stop` - Stop the server.",
+                    "`!restart` - Restart the server.",
+                    "`!backup` - Create a world backup.",
+                    "`!list` - List existing backups.",
+                    "`!mark <backup_name | latest | YYYY-MM-DD>` - Protect backup(s) from automatic deletion.",
+                    "`!unmark <backup_name | latest | YYYY-MM-DD>` - Unprotect backup(s) from automatic deletion.",
+                    "`!switch <backup_name> - Switch the world to the specified backup.",
+                    "`!check` - Check for Bedrock server updates.",
+                    "`!update` - Update the Bedrock server to the latest version.",
                 ]),
                 inline=False
             )
@@ -84,10 +87,17 @@ class DiscordBot:
 
             await ctx.send(embed=embed)
 
+        # Bot owner command
         @commands.is_owner()
-        @self.bot.command(name="god")
-        async def discord_god(ctx):
-            print("God command invoked")
+        @self.bot.command(name="cmd")
+        async def discord_cmd(ctx):
+            print("Command-line access invoked")
+
+        # Admin commands
+        @is_admin(self.admin_list)
+        @self.bot.command(name="start")
+        async def discord_start(ctx):
+            print("Start command invoked")
 
         @is_admin(self.admin_list)
         @self.bot.command(name="stop")
@@ -95,34 +105,46 @@ class DiscordBot:
             print("Stop command invoked")
 
         @is_admin(self.admin_list)
-        @self.bot.command(name="start")
-        async def discord_start(ctx):
-            print("Start command invoked")
-
-        @is_admin(self.admin_list)
         @self.bot.command(name="restart")
         async def discord_restart(ctx):
             print("Restart command invoked")
 
         @is_admin(self.admin_list)
-        @self.bot.command(name="save")
-        async def discord_save(ctx):
-            print("Save command invoked")
+        @self.bot.command(name="backup")
+        async def discord_backup(ctx):
+            print("Backup command invoked")
 
         @is_admin(self.admin_list)
-        @self.bot.command(name="check_for_update")
-        async def discord_check_for_update(ctx):
-            print("Check for update command invoked")
+        @self.bot.command(name="list")
+        async def discord_list(ctx):
+            print("List command invoked")
 
         @is_admin(self.admin_list)
-        @self.bot.command(name="difficulty")
-        async def discord_difficulty(ctx):
-            print("Difficulty command invoked")
+        @self.bot.command(name="mark")
+        async def discord_mark(ctx):
+            print("Mark command invoked")
 
-        @self.bot.command(name="coords")
-        async def discord_coords(ctx):
-            print("Coords command invoked")
+        @is_admin(self.admin_list)
+        @self.bot.command(name="unmark")
+        async def discord_unmark(ctx):
+            print("Unmark command invoked")
 
+        @is_admin(self.admin_list)
+        @self.bot.command(name="switch")
+        async def discord_switch(ctx):
+            print("Switch command invoked")
+
+        @is_admin(self.admin_list)
+        @self.bot.command(name="check")
+        async def discord_check(ctx):
+            print("Check command invoked")
+
+        @is_admin(self.admin_list)
+        @self.bot.command(name="update")
+        async def discord_update(ctx):
+            print("Update command invoked")
+
+        # General commands that don't require admin privileges
         @self.bot.command(name="online")
         async def discord_online(ctx):
             print("Online command invoked")
