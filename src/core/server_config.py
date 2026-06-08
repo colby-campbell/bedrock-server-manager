@@ -11,6 +11,21 @@ SETTINGS_FILE = "settings.toml"
 SERVER_PROPERTIES_FILE = "server.properties"
 LEVEL_NAME_KEY = "level-name"
 DEFAULT_WORLD_NAME = "Bedrock level"
+DEFAULT_DISCORD_COMMANDS = [
+    "cmd",
+    "start",
+    "stop",
+    "restart",
+    "backup",
+    "list",
+    "mark",
+    "unmark",
+    "switch",
+    "check",
+    "update",
+    "help",
+    "online"
+]
 
 
 class ServerConfigError(Exception):
@@ -34,9 +49,10 @@ class ServerConfig:
         LIST_OF_INTEGERS = 4
         LIST_OF_STRINGS = 5
         LIST_OF_STRINGS_OR_ALL = 6
-        FOLDER = 7
-        TIME = 8
-        PLATFORM = 9
+        LIST_OF_COMMANDS = 7
+        FOLDER = 8
+        TIME = 9
+        PLATFORM = 10
 
     class SettingContainer:
         """Container for a setting value, its name, and type."""
@@ -80,12 +96,30 @@ class ServerConfig:
     # Whether to enable the Discord bot.
     # Allowed Values: true, false
 
-    #bot_token="bot_token_here"  # Required only if discord_bot=true
+    bot_token="bot_token_here"
     # The Discord bot token from the Discord Developer Portal, keep it secret!
+    # Allowed Values: Any valid Discord bot token.
+    # Required only if discord_bot=true
 
-    #admin_list=[]  # Required only if discord_bot=true
+    admin_list=[]
     # List of Discord user IDs with admin privileges.
     # Allowed Values: [integer, integer, ...]
+    # Required only if discord_bot=true
+
+    [[custom_commands]]
+    name = "coordson"
+    command = "gamerule showcoordinates true"
+    admin = true
+    description = "Enable show coordinates."
+
+    [[custom_commands]]
+    name = "coordsoff"
+    command = "gamerule showcoordinates false"
+    admin = true
+    description = "Disable show coordinates."
+    # custom_commands (optional)
+    # List of custom commands to be added to the Discord bot, each with a name, command, admin requirement, and description.
+    # Allowed Values: [[name=string, command=string, admin=boolean, description=string], ...]
 
     auto_update=true
     # Whether to enable automatic updates (recommended).
@@ -143,6 +177,7 @@ class ServerConfig:
         self.discord_bot = cfg.get("discord_bot")
         self.bot_token = cfg.get("bot_token")
         self.admins = cfg.get("admin_list")
+        self.custom_commands = cfg.get("custom_commands", [])
         self.auto_update = cfg.get("auto_update")
         self.update_protected_paths = cfg.get("update_protected_paths")
         self.update_backup_paths = cfg.get("update_backup_paths")
@@ -203,6 +238,7 @@ class ServerConfig:
             self.SettingContainer(self.discord_bot, "discord_bot", self.SettingType.BOOLEAN),
             self.SettingContainer(self.bot_token, "bot_token", self.SettingType.STRING) if self.discord_bot else None,
             self.SettingContainer(self.admins, "admin_list", self.SettingType.LIST_OF_INTEGERS) if self.discord_bot else None,
+            self.SettingContainer(self.custom_commands, "custom_commands", self.SettingType.LIST_OF_COMMANDS) if self.discord_bot else None,
             self.SettingContainer(self.auto_update, "auto_update", self.SettingType.BOOLEAN),
             self.SettingContainer(self.platform, "platform", self.SettingType.PLATFORM),
             self.SettingContainer(self.world_name, "world_name", self.SettingType.STRING),
@@ -221,6 +257,7 @@ class ServerConfig:
             # Check for missing values
             if value is None:
                 errors.append(f"{name}: missing (required)")
+                continue
             # Validate based on type
             match stype:
                 case self.SettingType.STRING:
@@ -249,6 +286,36 @@ class ServerConfig:
                         errors.append(f"{name}: all items must be strings")
                     elif isinstance(value, str) and value.lower() != "all":
                         errors.append(f"{name}: if a string, must be 'all'")
+                case self.SettingType.LIST_OF_COMMANDS:
+                    if not isinstance(value, list):
+                        errors.append(f"{name}: must be a list of commands")
+                    else:
+                        seen_names = set()
+                        for i, cmd in enumerate(value):
+                            if not isinstance(cmd, dict):
+                                errors.append(f"{name}[{i}]: must be a table with keys 'name', 'command', 'admin', and 'description'")
+                                continue
+                            if "name" not in cmd or "command" not in cmd or "admin" not in cmd or "description" not in cmd:
+                                errors.append(f"{name}[{i}]: missing required keys (must have 'name', 'command', 'admin', and 'description')")
+                                continue
+                            # name must be a string, lowercase letters, numbers, underscores, or hyphens, unique, and cannot be a default command name
+                            if not isinstance(cmd["name"], str):
+                                errors.append(f"{name}[{i}]['name']: must be a string")
+                                continue
+                            if not re.match(r'^[a-z0-9_-]+$', cmd["name"]):
+                                errors.append(f"{name}[{i}]['name']: invalid command name (only lowercase letters, numbers, underscores, and hyphens allowed)")
+                            elif cmd["name"] in DEFAULT_DISCORD_COMMANDS:
+                                errors.append(f"{name}[{i}]['name']: cannot be a default command name ({cmd['name']})")
+                            elif cmd["name"] in seen_names:
+                                errors.append(f"{name}[{i}]['name']: duplicate command name '{cmd['name']}'")
+                            seen_names.add(cmd["name"])
+                            # command, admin, and description must be the correct types
+                            if not isinstance(cmd["command"], str):
+                                errors.append(f"{name}[{i}]['command']: must be a string")
+                            if not isinstance(cmd["admin"], bool):
+                                errors.append(f"{name}[{i}]['admin']: must be a boolean")
+                            if not isinstance(cmd["description"], str):
+                                errors.append(f"{name}[{i}]['description']: must be a string")
                 case self.SettingType.FOLDER:
                     if not isinstance(value, str):
                         errors.append(f"{name}: must be a string representing a folder path")
