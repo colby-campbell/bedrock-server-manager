@@ -1,4 +1,4 @@
-from utils import BroadcastHandler, LineBroadcaster
+from utils import BroadcastHandler, LineBroadcaster, LogLevel
 import asyncio
 import discord
 import logging
@@ -93,6 +93,7 @@ class DiscordBot:
             def on_server_output(_timestamp, line):
                 queue.put_nowait(line)
 
+            self.automation.log_print(LogLevel.INFO, f"cmd mode started by {ctx.author}.")
             self.server.stdout_broadcaster.subscribe(on_server_output)
             await ctx.send("Entered cmd mode. Type `exit` to quit. Times out after 60s of inactivity.")
 
@@ -115,11 +116,14 @@ class DiscordBot:
                         timeout=60.0
                     )
                     if msg.content.lower() == "exit":
+                        self.automation.log_print(LogLevel.INFO, f"cmd mode exited by {ctx.author}.")
                         await ctx.send("Exiting cmd mode.")
                         break
+                    self.automation.log_print(LogLevel.INFO, f"cmd mode command by {ctx.author}: {msg.content}")
                     self.server.send_command(msg.content)
                     await flush_queue()
             except asyncio.TimeoutError:
+                self.automation.log_print(LogLevel.INFO, f"cmd mode timed out for {ctx.author}.")
                 await ctx.send("cmd mode timed out due to inactivity.")
             finally:
                 self.server.stdout_broadcaster.unsubscribe(on_server_output)
@@ -128,61 +132,62 @@ class DiscordBot:
         @is_admin(self.admin_list)
         @self.bot.command(name="start")
         async def discord_start(ctx):
-            print("Start command invoked")
+            self.automation.log_print(LogLevel.INFO, f"!start invoked by {ctx.author}.")
 
         @is_admin(self.admin_list)
         @self.bot.command(name="stop")
         async def discord_stop(ctx):
-            print("Stop command invoked")
+            self.automation.log_print(LogLevel.INFO, f"!stop invoked by {ctx.author}.")
 
         @is_admin(self.admin_list)
         @self.bot.command(name="restart")
         async def discord_restart(ctx):
-            print("Restart command invoked")
+            self.automation.log_print(LogLevel.INFO, f"!restart invoked by {ctx.author}.")
 
         @is_admin(self.admin_list)
         @self.bot.command(name="backup")
         async def discord_backup(ctx):
-            print("Backup command invoked")
+            self.automation.log_print(LogLevel.INFO, f"!backup invoked by {ctx.author}.")
 
         @is_admin(self.admin_list)
         @self.bot.command(name="list")
         async def discord_list(ctx):
-            print("List command invoked")
+            self.automation.log_print(LogLevel.INFO, f"!list invoked by {ctx.author}.")
 
         @is_admin(self.admin_list)
         @self.bot.command(name="mark")
         async def discord_mark(ctx):
-            print("Mark command invoked")
+            self.automation.log_print(LogLevel.INFO, f"!mark invoked by {ctx.author}.")
 
         @is_admin(self.admin_list)
         @self.bot.command(name="unmark")
         async def discord_unmark(ctx):
-            print("Unmark command invoked")
+            self.automation.log_print(LogLevel.INFO, f"!unmark invoked by {ctx.author}.")
 
         @is_admin(self.admin_list)
         @self.bot.command(name="switch")
         async def discord_switch(ctx):
-            print("Switch command invoked")
+            self.automation.log_print(LogLevel.INFO, f"!switch invoked by {ctx.author}.")
 
         @is_admin(self.admin_list)
         @self.bot.command(name="check")
         async def discord_check(ctx):
-            print("Check command invoked")
+            self.automation.log_print(LogLevel.INFO, f"!check invoked by {ctx.author}.")
 
         @is_admin(self.admin_list)
         @self.bot.command(name="update")
         async def discord_update(ctx):
-            print("Update command invoked")
+            self.automation.log_print(LogLevel.INFO, f"!update invoked by {ctx.author}.")
 
         # General commands that don't require admin privileges
         @self.bot.command(name="online")
         async def discord_online(ctx):
-            print("Online command invoked")
+            self.automation.log_print(LogLevel.INFO, f"!online invoked by {ctx.author}.")
 
         @self.bot.event
         async def on_command_error(ctx, error):
             if isinstance(error, commands.errors.CheckFailure):
+                self.automation.log_print(LogLevel.WARN, f"Permission denied for {ctx.author} on command !{ctx.command}.")
                 await ctx.send("You do not have the permissions to use this command.")
 
         # Register custom commands from config
