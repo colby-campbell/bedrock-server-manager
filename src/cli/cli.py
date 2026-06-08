@@ -14,18 +14,18 @@ def add_colour(prefix, message):
         level = match.group("level")
         # ANSI color codes based on log level
         match level:
-            case "RAW":
-                ansi_code = "\033[32m"  # Green for raw
-            case "DEBUG":
-                ansi_code = "\033[36m"  # Cyan for debug
             case "INFO":
                 ansi_code = "\033[34m"  # Blue for info
+            case "DEBUG":
+                ansi_code = "\033[36m"  # Cyan for debug
             case "WARN":
                 ansi_code = "\033[33m"  # Yellow for warning
             case "ERROR":
                 ansi_code = "\033[31m"  # Red for error
             case "CRITICAL":
                 ansi_code = "\033[1;31m"  # Bold red for critical
+            case "RAW":
+                ansi_code = "\033[32m"  # Green for raw
             case _:
                 ansi_code = "\033[33m"  # Default to yellow for unrecognized levels
         # Calculate spacing for alignment

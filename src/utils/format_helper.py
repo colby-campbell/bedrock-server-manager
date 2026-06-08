@@ -8,12 +8,12 @@ SPACING_LENGTH = 9
 
 class LogLevel(enum.Enum):
     INFO = "INFO"
+    DEBUG = "DEBUG"
     WARN = "WARN"
     ERROR = "ERROR"
-    DEBUG = "DEBUG"
+    CRITICAL = "CRITICAL"
     RAW = "RAW"
     CLI = "CLI"
-    CRITICAL = "CRITICAL"
 
 
 def get_timestamp():
