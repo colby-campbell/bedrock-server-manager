@@ -150,9 +150,15 @@ class ServerAutomation:
             self.log_print(LogLevel.INFO, "Performing scheduled server restart now.")
 
             with self.runner.lock():
+                # Stop the server if it running
                 if self.runner.is_running():
                     self.runner.stop()
-                self._backup_world_offline()
+                # If auto-update is enabled in config, check for a server update
+                # update_server returns True if it already created a world backup
+                backed_up = self.update_server() if self.config.auto_update else False
+                # Backup the world if update_server didn't already do it
+                if not backed_up:
+                    self._backup_world_offline()
                 self.runner.start()
 
 
@@ -705,34 +711,42 @@ class ServerAutomation:
             _get_bedrock_update_info: to check for updates and get the download URL.
             _backup_server_files: to backup server files before updating.
             _extract_update_files: to extract the downloaded update files to the server folder.
+        Returns:
+            bool: True if a world backup was created before the update attempt, False otherwise.
         """
         # Verify the current version is known before proceeding with an update
         server_dir = Path(self.server_folder)
         if self.current_version is None:
             self.log_print(LogLevel.ERROR, "Cannot check for updates: server version is unknown. Ensure the server has started successfully.")
-            return "Cannot check for updates: server version is unknown. Ensure the server has started successfully."
+            return False
 
         # Check for updates and get the download URL
         updateInfo = get_bedrock_update_info(self.current_version, self.config.platform)
         if updateInfo.error:
             self.log_print(LogLevel.ERROR, f"Update check failed: {updateInfo.error}")
-            return "Update check failed; cannot proceed with update."
+            return False
         elif not updateInfo.update_available:
-            return f"No update available, you are running the latest version: {updateInfo.latest_version}."
-        
+            self.log_print(LogLevel.INFO, f"No update available, you are running the latest version: {updateInfo.latest_version}.")
+            return False
+
         with self.runner.lock():
             # Refuse to update if the server is running
             if self.runner.is_running():
                 self.log_print(LogLevel.ERROR, "Cannot update server while it is running.")
-                return "Cannot update server while it is running."
-            
+                return False
+
             self.log_print(LogLevel.INFO, f"Updating server from version {self.current_version} to {updateInfo.latest_version}...")
 
             # Backup the world and server files before updating
             self.log_print(LogLevel.INFO, "Creating offline backups of current world and server files before updating...")
-            if not (self._backup_world_offline(skip_pruning=True) and self._backup_server_files(skip_pruning=True)):
-                self.log_print(LogLevel.ERROR, "Failed to create backups before update.")
-                return "Failed to create backups before update."
+            
+            if not self._backup_world_offline(skip_pruning=True):
+                self.log_print(LogLevel.ERROR, "Failed to create world backup before update.")
+                return False
+
+            if not self._backup_server_files(skip_pruning=True):
+                self.log_print(LogLevel.ERROR, "Failed to create server backup before update.")
+                return True
 
             # Prepare paths to update the bedrock server
             temp_dir = Path(f"{TEMPORARY_PREFIX}_bedrock_update")
@@ -770,7 +784,7 @@ class ServerAutomation:
                 except Exception:
                     self.log_print(LogLevel.WARN, f"Failed to clean up temporary files after download failure: {temp_dir}")
                 self.log_print(LogLevel.ERROR, f"Failed to download update: {e}")
-                return "Failed to download update."
+                return True
             self.log_print(LogLevel.INFO, "Download completed.")
 
             # Extract the downloaded files to the server folder (overwrite existing files)
@@ -784,8 +798,8 @@ class ServerAutomation:
                 self.log_print(LogLevel.WARN, f"Failed to clean up temporary files after update: {temp_dir}, error: {e}")
 
             if not success:
-                return "Update failed during file extraction."
+                return True
 
             self.current_version = updateInfo.latest_version
             self.log_print(LogLevel.INFO, f"Server updated successfully to version {updateInfo.latest_version}.")
-            return f"Server updated successfully to version {updateInfo.latest_version}."
+            return True
