@@ -1,15 +1,10 @@
 import sys
 import os
 from pathlib import Path
-from core import ServerConfig
-from core import ServerConfigError
-from core import SettingsFileMissing
-from core import ServerRunner
-from core import ServerAutomation
-from bot import DiscordBot
+from core import ServerConfig, ServerConfigError, SettingsFileMissing, ServerRunner, ServerAutomation
+from utils import ServerOutput, Platform, download_and_extract_bedrock
 from cli import CommandLineInterface
-from utils import ServerOutput, Platform
-from utils.bedrock_downloader import download_and_extract_bedrock
+from bot import DiscordBot
 import threading
 import atexit
 
