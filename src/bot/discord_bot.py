@@ -182,30 +182,36 @@ class DiscordBot:
         @self.bot.command(name="mark")
         async def discord_mark(ctx, *, identifier: str):
             self.automation.log_print(LogLevel.INFO, f"!mark invoked by {ctx.author}.")
-            self.automation.mark_backup(identifier)
-
+            result = self.automation.mark_backup(identifier)
+            await ctx.send(result)
 
         @is_admin(self.admin_list)
         @self.bot.command(name="unmark")
         async def discord_unmark(ctx, *, identifier: str):
             self.automation.log_print(LogLevel.INFO, f"!unmark invoked by {ctx.author}.")
-            self.automation.unmark_backup(identifier)
+            result = self.automation.unmark_backup(identifier)
+            await ctx.send(result)
 
         @is_admin(self.admin_list)
         @self.bot.command(name="switch")
         async def discord_switch(ctx, *, identifier: str):
             self.automation.log_print(LogLevel.INFO, f"!switch invoked by {ctx.author}.")
-            self.automation.switch_to_backup_world(identifier)
+            result = self.automation.switch_to_backup_world(identifier)
+            await ctx.send(result)
 
         @is_admin(self.admin_list)
         @self.bot.command(name="check")
         async def discord_check(ctx):
             self.automation.log_print(LogLevel.INFO, f"!check invoked by {ctx.author}.")
+            result = self.automation.check_for_updates()
+            await ctx.send(result)
 
         @is_admin(self.admin_list)
         @self.bot.command(name="update")
         async def discord_update(ctx):
             self.automation.log_print(LogLevel.INFO, f"!update invoked by {ctx.author}.")
+            result = self.automation.update_server()
+            await ctx.send(result)
 
         # General commands that don't require admin privileges
         @self.bot.command(name="online")
@@ -219,7 +225,7 @@ class DiscordBot:
                 await ctx.send("You do not have the permissions to use this command.")
             elif isinstance(error, commands.errors.MissingRequiredArgument):
                 usage = {
-                    "mark":   "Usage: `!mark <backup_name | latest | YYYY-MM-DD>`",
+                    "mark": "Usage: `!mark <backup_name | latest | YYYY-MM-DD>`",
                     "unmark": "Usage: `!unmark <backup_name | latest | YYYY-MM-DD>`",
                     "switch": "Usage: `!switch <backup_name>`",
                 }
