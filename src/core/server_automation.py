@@ -749,6 +749,8 @@ class ServerAutomation:
             _get_bedrock_update_info: to check for updates and get the download URL.
             _backup_server_files: to backup server files before updating.
             _extract_update_files: to extract the downloaded update files to the server folder.
+        Args:
+            skip_world_backup (bool): If True, skip creating a backup of the world before updating. Not recommended, use with caution.
         Returns:
             bool: True if a world backup was created before the update attempt, False otherwise.
         """
@@ -777,11 +779,10 @@ class ServerAutomation:
             self.log_print(LogLevel.INFO, f"Updating server from version {self.current_version} to {updateInfo.latest_version}...")
 
             # Backup the world and server files before updating
-            self.log_print(LogLevel.INFO, "Creating offline backups of current world and server files before updating...")
-            
-            if not self._backup_world_offline(skip_pruning=True):
-                self.log_print(LogLevel.ERROR, "Failed to create world backup before update.")
-                return "Failed to create world backup before update."
+            if not skip_world_backup:
+                if not self._backup_world_offline(skip_pruning=True):
+                    self.log_print(LogLevel.ERROR, "Failed to create world backup before update.")
+                    return "Failed to create world backup before update."
 
             if not self._backup_server_files(skip_pruning=True):
                 self.log_print(LogLevel.ERROR, "Failed to create server backup before update.")
