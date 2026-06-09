@@ -754,26 +754,27 @@ class ServerAutomation:
         Returns:
             bool: True if a world backup was created before the update attempt, False otherwise.
         """
-        # Verify the current version is known before proceeding with an update
-        server_dir = Path(self.server_folder)
-        if self.current_version is None:
-            self.log_print(LogLevel.ERROR, "Cannot check for updates: server version is unknown. Ensure the server has started successfully.")
-            return "Cannot check for updates: server version is unknown. Ensure the server has started successfully."
-
-        # Check for updates and get the download URL
-        updateInfo = get_bedrock_update_info(self.current_version, self.config.platform)
-        if updateInfo.error:
-            self.log_print(LogLevel.ERROR, f"Update check failed: {updateInfo.error}")
-            return "Update check failed."
-        elif not updateInfo.update_available:
-            self.log_print(LogLevel.INFO, f"No update available, you are running the latest version: {updateInfo.latest_version}.")
-            return "No update available."
 
         with self.runner.lock():
             # Refuse to update if the server is running
             if self.runner.is_running():
                 self.log_print(LogLevel.ERROR, "Cannot update server while it is running.")
                 return "Cannot update server while it is running."
+            
+            # Verify the current version is known before proceeding with an update
+            server_dir = Path(self.server_folder)
+            if self.current_version is None:
+                self.log_print(LogLevel.ERROR, "Cannot check for updates: server version is unknown. Ensure the server has started successfully.")
+                return "Cannot check for updates: server version is unknown. Ensure the server has started successfully."
+
+            # Check for updates and get the download URL
+            updateInfo = get_bedrock_update_info(self.current_version, self.config.platform)
+            if updateInfo.error:
+                self.log_print(LogLevel.ERROR, f"Update check failed: {updateInfo.error}")
+                return "Update check failed."
+            elif not updateInfo.update_available:
+                self.log_print(LogLevel.INFO, f"No update available, you are running the latest version: {updateInfo.latest_version}.")
+                return "No update available."
 
             self.log_print(LogLevel.INFO, f"Updating server from version {self.current_version} to {updateInfo.latest_version}...")
 
