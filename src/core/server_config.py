@@ -190,8 +190,7 @@ class ServerConfig:
             self.platform = None
 
         # Determine the world name from the server's properties file if not set
-        settings_path = os.path.join(self.server_folder, SERVER_PROPERTIES_FILE)
-        detected_world_name = self._get_world_name_from_properties(settings_path)
+        detected_world_name = self._get_world_name_from_properties(self.server_folder)
         self.world_name = cfg.get("world_name", detected_world_name)
 
         # Validate the config file settings
@@ -199,20 +198,21 @@ class ServerConfig:
         if errors:
             raise ServerConfigError("\n".join(errors))
 
-    def _get_world_name_from_properties(self, properties_path):
+    def _get_world_name_from_properties(self, server_folder):
         """
         Private method to extract the world name from the server's properties file.
         Args:
-            properties_path (str): Path to the server's properties file.
+            server_folder (str): Path to the server folder.
         Returns:
             str: The world name extracted from the properties file.
         """
         try:
+            properties_path = os.path.join(server_folder, SERVER_PROPERTIES_FILE)
             with open(properties_path, "r", encoding="utf-8") as f:
                 for line in f:
-                    if not line or line.startswith("#"):
+                    if line.startswith("#"):
                         continue
-                    if line.strip().startswith(LEVEL_NAME_KEY) and "=" in line:
+                    if line.strip().startswith(LEVEL_NAME_KEY + "="):
                         return line.split("=", 1)[1].strip()
         except Exception:
             pass
