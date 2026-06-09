@@ -601,6 +601,9 @@ class ServerAutomation:
         """
         Check for Bedrock server updates, uses the platform to determine the correct download type.
         """
+        if self.current_version is None:
+            self.log_print(LogLevel.WARN, "Current server version unknown, cannot check for updates.")
+            return "Current server version unknown, cannot check for updates."
         updateInfo = get_bedrock_update_info(self.current_version, self.config.platform)
         if updateInfo.error:
             self.log_print(LogLevel.ERROR, f"Update check failed: {updateInfo.error}")
