@@ -180,6 +180,7 @@ class ServerRunner:
                 self.process.kill()
                 self.process.wait()
             # Clean up
+            self._stdout_thread.join()
             self.process = None
             self._stdout_thread = None
             # Clean up the Windows Job Object if it exists
