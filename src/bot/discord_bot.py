@@ -153,7 +153,7 @@ class DiscordBot:
                 await ctx.send("Server is already running.")
             else:
                 await ctx.send("Server is starting...")
-                self.runner.start()
+                await asyncio.get_event_loop().run_in_executor(None, self.runner.start)
                 await ctx.send("Server started.")
 
         @is_admin(self.admin_list)
@@ -162,7 +162,7 @@ class DiscordBot:
             self.automation.log_print(LogLevel.INFO, f"!stop invoked by {ctx.author}.")
             if self.runner.is_running():
                 await ctx.send("Server is stopping...")
-                self.runner.stop()
+                await asyncio.get_event_loop().run_in_executor(None, self.runner.stop)
                 await ctx.send("Server stopped.")
             else:
                 await ctx.send("Server is not running.")
@@ -173,18 +173,18 @@ class DiscordBot:
             self.automation.log_print(LogLevel.INFO, f"!restart invoked by {ctx.author}.")
             if self.runner.is_running():
                 await ctx.send("Server is restarting...")
-                self.runner.restart()
+                await asyncio.get_event_loop().run_in_executor(None, self.runner.restart)
                 await ctx.send("Server restarted.")
             else:
                 await ctx.send("Server is not running, starting server...")
-                self.runner.start()
+                await asyncio.get_event_loop().run_in_executor(None, self.runner.start)
 
         @is_admin(self.admin_list)
         @self.bot.command(name="backup")
         async def discord_backup(ctx):
             self.automation.log_print(LogLevel.INFO, f"!backup invoked by {ctx.author}.")
             await ctx.send("Starting world backup...")
-            self.automation.smart_backup()
+            await asyncio.get_event_loop().run_in_executor(None, self.automation.smart_backup)
             await ctx.send("World backup completed.")
             
         @is_admin(self.admin_list)
@@ -213,14 +213,14 @@ class DiscordBot:
         async def discord_switch(ctx, *, identifier: str):
             self.automation.log_print(LogLevel.INFO, f"!switch invoked by {ctx.author}.")
             await ctx.send("Switching world to specified backup...")
-            result = self.automation.switch_to_backup_world(identifier)
+            result = await asyncio.get_event_loop().run_in_executor(None, self.automation.switch_to_backup_world, identifier)
             await ctx.send(result)
 
         @is_admin(self.admin_list)
         @self.bot.command(name="check")
         async def discord_check(ctx):
             self.automation.log_print(LogLevel.INFO, f"!check invoked by {ctx.author}.")
-            result = self.automation.check_for_updates()
+            result = await asyncio.get_event_loop().run_in_executor(None, self.automation.check_for_updates)
             await ctx.send(result)
 
         @is_admin(self.admin_list)
@@ -228,14 +228,14 @@ class DiscordBot:
         async def discord_update(ctx):
             self.automation.log_print(LogLevel.INFO, f"!update invoked by {ctx.author}.")
             await ctx.send("Updating server to latest version...")
-            result = self.automation.update_server()
+            result = await asyncio.get_event_loop().run_in_executor(None, self.automation.update_server)
             await ctx.send(result)
 
         # General commands that don't require admin privileges
         @self.bot.command(name="online")
         async def discord_online(ctx):
             self.automation.log_print(LogLevel.INFO, f"!online invoked by {ctx.author}.")
-            result = self.automation.get_online_players()
+            result = await asyncio.get_event_loop().run_in_executor(None, self.automation.get_online_players)
             await ctx.send(result)
 
         @self.bot.event
