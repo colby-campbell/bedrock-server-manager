@@ -126,8 +126,8 @@ class ServerConfig:
     # Used only if discord_bot=true
 
     # custom_commands (optional)
-    # List of custom commands to be added to the Discord bot, each with a name, command, admin requirement, and description.
-    # Allowed Values: [[name=string, command=string, admin=boolean, description=string], ...]
+    # List of custom commands to be added to the Discord bot, each with a name, command, admin requirement, description, and response.
+    # Allowed Values: [[name=string, command=string, admin=boolean, description=string, response=string], ...]
     # Must be placed at the end of the file due to TOML array-of-tables rules.
     
     [[custom_commands]]
@@ -135,12 +135,14 @@ class ServerConfig:
     command = "gamerule showcoordinates true"
     admin = true
     description = "Enable show coordinates."
+    response = "Coordinates enabled."
 
     [[custom_commands]]
     name = "coordsoff"
     command = "gamerule showcoordinates false"
     admin = true
     description = "Disable show coordinates."
+    response = "Coordinates disabled."
     """
 
     def __init__(self):
@@ -326,8 +328,8 @@ class ServerConfig:
                             if not isinstance(cmd, dict):
                                 errors.append(f"{name}[{i}]: must be a table with keys 'name', 'command', 'admin', and 'description'")
                                 continue
-                            if "name" not in cmd or "command" not in cmd or "admin" not in cmd or "description" not in cmd:
-                                errors.append(f"{name}[{i}]: missing required keys (must have 'name', 'command', 'admin', and 'description')")
+                            if "name" not in cmd or "command" not in cmd or "admin" not in cmd or "description" not in cmd or "response" not in cmd:
+                                errors.append(f"{name}[{i}]: missing required keys (must have 'name', 'command', 'admin', 'description', and 'response')")
                                 continue
                             # name must be a string, lowercase letters, numbers, underscores, or hyphens, unique, and cannot be a default command name
                             if not isinstance(cmd["name"], str):
@@ -347,5 +349,7 @@ class ServerConfig:
                                 errors.append(f"{name}[{i}]['admin']: must be a boolean")
                             if not isinstance(cmd["description"], str):
                                 errors.append(f"{name}[{i}]['description']: must be a string")
+                            if not isinstance(cmd["response"], str):
+                                errors.append(f"{name}[{i}]['response']: must be a string")
         
         return errors

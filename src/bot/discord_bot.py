@@ -251,15 +251,19 @@ class DiscordBot:
                 }
                 msg = usage.get(ctx.command.name, f"Usage: `!{ctx.command.name}` requires an argument.")
                 await ctx.send(msg)
+            elif isinstance(error, commands.errors.CommandInvokeError):
+                self.automation.log_print(LogLevel.ERROR, f"!{ctx.command} raised an error: {error.original}")
+                await ctx.send(f"An error occurred, contact the server administrator.")
 
         # Register custom commands from config
         for entry in self.custom_commands:
-            def make_handler(cmd_str, cmd_name):
+            def make_handler(cmd_str, cmd_name, cmd_response):
                 async def handler(_ctx):
                     self.automation.log_print(LogLevel.INFO, f"!{cmd_name} invoked by {_ctx.author}.")
                     self.runner.send_command(cmd_str)
+                    await _ctx.send(cmd_response)
                 return handler
-            cmd = commands.Command(make_handler(entry["command"], entry["name"]), name=entry["name"], help=entry["description"])
+            cmd = commands.Command(make_handler(entry["command"], entry["name"], entry["response"]), name=entry["name"], help=entry["description"])
             if entry["admin"]:
                 cmd.add_check(is_admin(self.admin_list).predicate)
             self.bot.add_command(cmd)
