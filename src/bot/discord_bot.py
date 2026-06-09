@@ -133,41 +133,69 @@ class DiscordBot:
         @self.bot.command(name="start")
         async def discord_start(ctx):
             self.automation.log_print(LogLevel.INFO, f"!start invoked by {ctx.author}.")
+            if self.runner.is_running():
+                await ctx.send("Server is already running.")
+            else:
+                await ctx.send("Server is starting...")
+                self.runner.start_server()
+                await ctx.send("Server started.")
 
         @is_admin(self.admin_list)
         @self.bot.command(name="stop")
         async def discord_stop(ctx):
             self.automation.log_print(LogLevel.INFO, f"!stop invoked by {ctx.author}.")
+            if self.runner.is_running():
+                await ctx.send("Server is stopping...")
+                self.runner.stop_server()
+                await ctx.send("Server stopped.")
+            else:
+                await ctx.send("Server is not running.")
 
         @is_admin(self.admin_list)
         @self.bot.command(name="restart")
         async def discord_restart(ctx):
             self.automation.log_print(LogLevel.INFO, f"!restart invoked by {ctx.author}.")
+            if self.runner.is_running():
+                await ctx.send("Server is restarting...")
+                self.runner.restart()
+                await ctx.send("Server restarted.")
+            else:
+                await ctx.send("Server is not running, starting server...")
+                self.runner.start()
 
         @is_admin(self.admin_list)
         @self.bot.command(name="backup")
         async def discord_backup(ctx):
             self.automation.log_print(LogLevel.INFO, f"!backup invoked by {ctx.author}.")
-
+            await ctx.send("Starting world backup...")
+            self.automation.smart_backup()
+            await ctx.send("World backup completed.")
+            
         @is_admin(self.admin_list)
         @self.bot.command(name="list")
         async def discord_list(ctx):
             self.automation.log_print(LogLevel.INFO, f"!list invoked by {ctx.author}.")
+            result = self.automation.list_backups()
+            await ctx.send(result)
 
         @is_admin(self.admin_list)
         @self.bot.command(name="mark")
-        async def discord_mark(ctx):
+        async def discord_mark(ctx, *, identifier: str):
             self.automation.log_print(LogLevel.INFO, f"!mark invoked by {ctx.author}.")
+            self.automation.mark_backup(identifier)
+
 
         @is_admin(self.admin_list)
         @self.bot.command(name="unmark")
-        async def discord_unmark(ctx):
+        async def discord_unmark(ctx, *, identifier: str):
             self.automation.log_print(LogLevel.INFO, f"!unmark invoked by {ctx.author}.")
+            self.automation.unmark_backup(identifier)
 
         @is_admin(self.admin_list)
         @self.bot.command(name="switch")
-        async def discord_switch(ctx):
+        async def discord_switch(ctx, *, identifier: str):
             self.automation.log_print(LogLevel.INFO, f"!switch invoked by {ctx.author}.")
+            self.automation.switch_to_backup_world(identifier)
 
         @is_admin(self.admin_list)
         @self.bot.command(name="check")
@@ -189,6 +217,14 @@ class DiscordBot:
             if isinstance(error, commands.errors.CheckFailure):
                 self.automation.log_print(LogLevel.WARN, f"Permission denied for {ctx.author} on command !{ctx.command}.")
                 await ctx.send("You do not have the permissions to use this command.")
+            elif isinstance(error, commands.errors.MissingRequiredArgument):
+                usage = {
+                    "mark":   "Usage: `!mark <backup_name | latest | YYYY-MM-DD>`",
+                    "unmark": "Usage: `!unmark <backup_name | latest | YYYY-MM-DD>`",
+                    "switch": "Usage: `!switch <backup_name>`",
+                }
+                msg = usage.get(ctx.command.name, f"Usage: `!{ctx.command.name}` requires an argument.")
+                await ctx.send(msg)
 
         # Register custom commands from config
         for entry in self.custom_commands:
