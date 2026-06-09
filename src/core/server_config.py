@@ -11,6 +11,17 @@ SETTINGS_FILE = "settings.toml"
 SERVER_PROPERTIES_FILE = "server.properties"
 LEVEL_NAME_KEY = "level-name"
 DEFAULT_WORLD_NAME = "Bedrock level"
+DEFAULT_DISCORD_COMMANDS = [
+    "cmd", "start", "stop", "restart", "backup",
+    "list", "mark", "unmark", "switch", "check",
+    "update", "help", "online"
+]
+ROOT_LEVEL_KEYS = {
+    "server_folder", "log_folder", "backup_folder", "backup_duration",
+    "shutdown_timeout", "crash_limit", "restart_time", "discord_bot",
+    "bot_token", "admin_list", "auto_update", "update_protected_paths",
+    "update_backup_paths", "platform", "world_name"
+}
 
 
 class ServerConfigError(Exception):
@@ -37,6 +48,7 @@ class ServerConfig:
         FOLDER = 7
         TIME = 8
         PLATFORM = 9
+        CURRENT_TABLE = 10
 
     class SettingContainer:
         """Container for a setting value, its name, and type."""
@@ -76,26 +88,15 @@ class ServerConfig:
     # Time to restart the server daily in HH:MM (24-hour) format.
     # Allowed Values: "HH:MM" where HH is 00-23 and MM is 00-59
 
-    discord_bot=false
-    # Whether to enable the Discord bot.
-    # Allowed Values: true, false
-
-    #bot_token="bot_token_here"  # Required only if discord_bot=true
-    # The Discord bot token from the Discord Developer Portal, keep it secret!
-
-    #admin_list=[]  # Required only if discord_bot=true
-    # List of Discord user IDs with admin privileges.
-    # Allowed Values: [integer, integer, ...]
-
     auto_update=true
     # Whether to enable automatic updates (recommended).
     # Allowed Values: true, false
 
-    update_protected_paths=["server.properties", "allowlist.json", "permissions.json", "server.properties", "profanity_filter.wlist"]
+    update_protected_paths=["server.properties", "allowlist.json", "permissions.json", "profanity_filter.wlist"]
     # List of server files/folders to protect from being overwritten during an update (worlds are always protected).
     # Allowed Values: [string, string, ...]
 
-    update_backup_paths=["server.properties", "allowlist.json", "permissions.json", "server.properties", "profanity_filter.wlist"]
+    update_backup_paths=["server.properties", "allowlist.json", "permissions.json", "profanity_filter.wlist"]
     # List of server files/folders to back up before performing an update, must be relative to the server folder (worlds are always backed up).
     # Allowed Values: [string, string, ...] | all
 
@@ -109,6 +110,39 @@ class ServerConfig:
     # If not set, this is auto-detected from 'f{LEVEL_NAME_KEY}' in {SERVER_PROPERTIES_FILE}.
     # Set manually only if auto-detection fails.
     #world_name=
+
+    discord_bot=false
+    # Whether to enable the Discord bot.
+    # Allowed Values: true, false
+
+    bot_token="bot_token_here"
+    # The Discord bot token from the Discord Developer Portal, keep it secret!
+    # Allowed Values: Any valid Discord bot token.
+    # Required only if discord_bot=true
+
+    admin_list=[]
+    # List of Discord user IDs with admin privileges, bot owners are always admins.
+    # Allowed Values: [integer, integer, ...]
+    # Used only if discord_bot=true
+
+    # custom_commands (optional)
+    # List of custom commands to be added to the Discord bot, each with a name, command, admin requirement, description, and response.
+    # Allowed Values: [[name=string, command=string, admin=boolean, description=string, response=string], ...]
+    # Must be placed at the end of the file due to TOML array-of-tables rules.
+    
+    [[custom_commands]]
+    name = "coordson"
+    command = "gamerule showcoordinates true"
+    admin = true
+    description = "Enable show coordinates."
+    response = "Coordinates enabled."
+
+    [[custom_commands]]
+    name = "coordsoff"
+    command = "gamerule showcoordinates false"
+    admin = true
+    description = "Disable show coordinates."
+    response = "Coordinates disabled."
     """
 
     def __init__(self):
@@ -131,7 +165,6 @@ class ServerConfig:
             except tomllib.TOMLDecodeError as e:
                 raise ServerConfigError(f"{SETTINGS_FILE}: invalid TOML format: {e}") from e
 
-        # TODO: Add default values for optional settings?
         # Load the config settings
         self.server_folder = cfg.get("server_folder")
         self.log_folder = cfg.get("log_folder")
@@ -140,12 +173,13 @@ class ServerConfig:
         self.shutdown_timeout = cfg.get("shutdown_timeout")
         self.crash_limit = cfg.get("crash_limit")
         self.restart_time = cfg.get("restart_time")
-        self.discord_bot = cfg.get("discord_bot")
-        self.bot_token = cfg.get("bot_token")
-        self.admins = cfg.get("admin_list")
         self.auto_update = cfg.get("auto_update")
         self.update_protected_paths = cfg.get("update_protected_paths")
         self.update_backup_paths = cfg.get("update_backup_paths")
+        self.discord_bot = cfg.get("discord_bot")
+        self.bot_token = cfg.get("bot_token")
+        self.admins = cfg.get("admin_list")
+        self.custom_commands = cfg.get("custom_commands", [])
 
         # Determine the platform if not set
         detected_platform = platform.system()
@@ -156,8 +190,7 @@ class ServerConfig:
             self.platform = None
 
         # Determine the world name from the server's properties file if not set
-        settings_path = os.path.join(self.server_folder, SERVER_PROPERTIES_FILE)
-        detected_world_name = self._get_world_name_from_properties(settings_path)
+        detected_world_name = self._get_world_name_from_properties(self.server_folder)
         self.world_name = cfg.get("world_name", detected_world_name)
 
         # Validate the config file settings
@@ -165,20 +198,21 @@ class ServerConfig:
         if errors:
             raise ServerConfigError("\n".join(errors))
 
-    def _get_world_name_from_properties(self, properties_path):
+    def _get_world_name_from_properties(self, server_folder):
         """
         Private method to extract the world name from the server's properties file.
         Args:
-            properties_path (str): Path to the server's properties file.
+            server_folder (str): Path to the server folder.
         Returns:
             str: The world name extracted from the properties file.
         """
         try:
+            properties_path = os.path.join(server_folder, SERVER_PROPERTIES_FILE)
             with open(properties_path, "r", encoding="utf-8") as f:
                 for line in f:
-                    if not line or line.startswith("#"):
+                    if line.startswith("#"):
                         continue
-                    if line.strip().startswith(LEVEL_NAME_KEY) and "=" in line:
+                    if line.strip().startswith(LEVEL_NAME_KEY + "="):
                         return line.split("=", 1)[1].strip()
         except Exception:
             pass
@@ -200,17 +234,27 @@ class ServerConfig:
             self.SettingContainer(self.shutdown_timeout, "shutdown_timeout", self.SettingType.INTEGER),
             self.SettingContainer(self.crash_limit, "crash_limit", self.SettingType.INTEGER),
             self.SettingContainer(self.restart_time, "restart_time", self.SettingType.TIME),
-            self.SettingContainer(self.discord_bot, "discord_bot", self.SettingType.BOOLEAN),
-            self.SettingContainer(self.bot_token, "bot_token", self.SettingType.STRING) if self.discord_bot else None,
-            self.SettingContainer(self.admins, "admin_list", self.SettingType.LIST_OF_INTEGERS) if self.discord_bot else None,
             self.SettingContainer(self.auto_update, "auto_update", self.SettingType.BOOLEAN),
             self.SettingContainer(self.platform, "platform", self.SettingType.PLATFORM),
             self.SettingContainer(self.world_name, "world_name", self.SettingType.STRING),
             self.SettingContainer(self.update_protected_paths, "update_protected_paths", self.SettingType.LIST_OF_STRINGS),
-            self.SettingContainer(self.update_backup_paths, "update_backup_paths", self.SettingType.LIST_OF_STRINGS_OR_ALL)
+            self.SettingContainer(self.update_backup_paths, "update_backup_paths", self.SettingType.LIST_OF_STRINGS_OR_ALL),
+            self.SettingContainer(self.discord_bot, "discord_bot", self.SettingType.BOOLEAN),
+            self.SettingContainer(self.bot_token, "bot_token", self.SettingType.STRING) if self.discord_bot else None,
+            self.SettingContainer(self.admins, "admin_list", self.SettingType.LIST_OF_INTEGERS) if self.discord_bot else None,
+            self.SettingContainer(self.custom_commands, "custom_commands", self.SettingType.CURRENT_TABLE) if self.discord_bot else None
         )
 
         errors = []
+
+        # Before validating individual settings, check for any ROOT_LEVEL_KEYS that are incorrectly placed in custom_commands blocks
+        misplaced = set()
+        # If any of the ROOT_LEVEL_KEYS are found in the custom_commands entry
+        for entry in self.custom_commands:
+            misplaced.update(ROOT_LEVEL_KEYS & set(entry.keys()))
+        if misplaced:
+            errors.append("custom_commands: move all [[custom_commands]] blocks to the end of the file; settings found in [[custom_commands]] blocks")
+
         for container in CHECK_VARIABLES:
             # Skip None containers (conditional settings)
             if container is None:
@@ -218,9 +262,13 @@ class ServerConfig:
             value = container.setting_value
             name = container.setting_name
             stype = container.setting_type
-            # Check for missing values
+            # Check for missing values or values that are misplaced in custom_commands blocks
             if value is None:
-                errors.append(f"{name}: missing (required)")
+                if name in misplaced:
+                    errors.append(f"{name}: found in [[custom_commands]] block; move to root level")
+                else:
+                    errors.append(f"{name}: missing (required)")
+                continue
             # Validate based on type
             match stype:
                 case self.SettingType.STRING:
@@ -271,5 +319,37 @@ class ServerConfig:
                 case self.SettingType.PLATFORM:
                     if not isinstance(value, Platform):
                         errors.append(f"{name}: must be either 'Windows' or 'Linux'")
+                case self.SettingType.CURRENT_TABLE:
+                    if not isinstance(value, list):
+                        errors.append(f"{name}: must be a list of commands")
+                    else:
+                        seen_names = set()
+                        for i, cmd in enumerate(value):
+                            if not isinstance(cmd, dict):
+                                errors.append(f"{name}[{i}]: must be a table with keys 'name', 'command', 'admin', and 'description'")
+                                continue
+                            if "name" not in cmd or "command" not in cmd or "admin" not in cmd or "description" not in cmd or "response" not in cmd:
+                                errors.append(f"{name}[{i}]: missing required keys (must have 'name', 'command', 'admin', 'description', and 'response')")
+                                continue
+                            # name must be a string, lowercase letters, numbers, underscores, or hyphens, unique, and cannot be a default command name
+                            if not isinstance(cmd["name"], str):
+                                errors.append(f"{name}[{i}]['name']: must be a string")
+                                continue
+                            if not re.match(r'^[a-z0-9_-]+$', cmd["name"]):
+                                errors.append(f"{name}[{i}]['name']: invalid command name (only lowercase letters, numbers, underscores, and hyphens allowed)")
+                            elif cmd["name"] in DEFAULT_DISCORD_COMMANDS:
+                                errors.append(f"{name}[{i}]['name']: cannot be a default command name ({cmd['name']})")
+                            elif cmd["name"] in seen_names:
+                                errors.append(f"{name}[{i}]['name']: duplicate command name '{cmd['name']}'")
+                            seen_names.add(cmd["name"])
+                            # command, admin, and description must be the correct types
+                            if not isinstance(cmd["command"], str):
+                                errors.append(f"{name}[{i}]['command']: must be a string")
+                            if not isinstance(cmd["admin"], bool):
+                                errors.append(f"{name}[{i}]['admin']: must be a boolean")
+                            if not isinstance(cmd["description"], str):
+                                errors.append(f"{name}[{i}]['description']: must be a string")
+                            if not isinstance(cmd["response"], str):
+                                errors.append(f"{name}[{i}]['response']: must be a string")
         
         return errors

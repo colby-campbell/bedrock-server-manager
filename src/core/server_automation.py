@@ -153,13 +153,41 @@ class ServerAutomation:
                 # Stop the server if it running
                 if self.runner.is_running():
                     self.runner.stop()
-                # If auto-update is enabled in config, check for a server update
-                # update_server returns True if it already created a world backup
-                backed_up = self.update_server() if self.config.auto_update else False
-                # Backup the world if update_server didn't already do it
-                if not backed_up:
-                    self._backup_world_offline()
+                # Perform a world backup
+                self._backup_world_offline()
+                # If auto-update is enabled in config, check for a server update (skipping the world backup)
+                self.update_server(skip_world_backup=True)
+                # Start the server again
                 self.runner.start()
+
+    
+    def get_online_players(self):
+        """Get the list of online players from the server."""
+        with self.runner.lock():
+            if self.runner.is_running():
+                try:
+                    self.runner.send_command("list")
+                except RuntimeError:
+                    self.log_print(LogLevel.ERROR, "Failed to send 'list' command: server is not running.")
+                    return "No online players (server is offline)."
+                # Wait briefly for output to be processed to the deque buffer
+                sleep(0.25)
+                # Look for the line that starts with "There are X/Y players online:" and extract the player list from the preceding lines
+                for index, line in enumerate(self._recent_lines):
+                    match = re.search(r"There are (\d+)\/(\d+) players online:", line)
+                    if match:
+                        player_count = int(match.group(1))
+                        max_players = int(match.group(2))
+                        if player_count == 0:
+                            return f"There are 0/{max_players} players online."
+                        else:
+                            # Player names follow the header in server output, so they sit at lower indices (newer) in the newest-first deque
+                            players = []
+                            for i in range(index - player_count, index):
+                                players.append(self._recent_lines[i].strip())
+                            return f"There are {player_count}/{max_players} players online: {', '.join(players)}"
+            else:
+                return "No online players (server is offline)."
 
 
     def _prune_old_backups(self, backup_root: Path):
@@ -400,9 +428,9 @@ class ServerAutomation:
                     backups.append(backup.name)
         if backups:
             # TODO: Format output better
-            self.log_print(LogLevel.INFO, f"Existing backups: {', '.join(backups)}")
+            return f"Existing backups: {', '.join(backups)}"
         else:
-            self.log_print(LogLevel.INFO, "No backups found.")
+            return "No backups found."
 
 
     def mark_backup(self, identifier):
@@ -426,8 +454,10 @@ class ServerAutomation:
                 protected_name = PROTECTED_BACKUP_PREFIX + "_" + latest_backup.name
                 latest_backup.rename(backup_root / protected_name)
                 self.log_print(LogLevel.INFO, f"Marked latest backup as protected: {protected_name}")
+                return f"Marked latest backup as protected: {protected_name}"
             else:
                 self.log_print(LogLevel.WARN, "No backups found to mark as protected.")
+                return "No backups found to mark as protected."
         elif re.match(r'^\d{4}-\d{2}-\d{2}$', identifier):
             # Mark all backups from the given date
             date_str = identifier
@@ -441,8 +471,10 @@ class ServerAutomation:
                         marked_backups.append(protected_name)
             if marked_backups:
                 self.log_print(LogLevel.INFO, f"Marked backups from {date_str} as protected: {', '.join(marked_backups)}")
+                return f"Marked backups from {date_str} as protected: {', '.join(marked_backups)}"
             else:
                 self.log_print(LogLevel.WARN, f"No backups found from date {date_str} to mark as protected.")
+                return f"No backups found from date {date_str} to mark as protected."
         else:
             # Mark a specific backup by name
             backup_path = backup_root / identifier
@@ -450,8 +482,10 @@ class ServerAutomation:
                 protected_name = PROTECTED_BACKUP_PREFIX + "_" + backup_path.name
                 backup_path.rename(backup_root / protected_name)
                 self.log_print(LogLevel.INFO, f"Marked backup as protected: {protected_name}")
+                return f"Marked backup as protected: {protected_name}"
             else:
                 self.log_print(LogLevel.WARN, f"Backup '{identifier}' not found to mark as protected.")
+                return f"Backup '{identifier}' not found to mark as protected."
 
 
     def unmark_backup(self, identifier):
@@ -475,8 +509,10 @@ class ServerAutomation:
                 unprotected_name = latest_backup.name[len(PROTECTED_BACKUP_PREFIX) + 1:]
                 latest_backup.rename(backup_root / unprotected_name)
                 self.log_print(LogLevel.INFO, f"Unmarked latest backup as protected: {unprotected_name}")
+                return f"Unmarked latest backup as protected: {unprotected_name}"
             else:
                 self.log_print(LogLevel.WARN, "No backups found to unmark as protected.")
+                return "No backups found to unmark as protected."
         elif re.match(r'^\d{4}-\d{2}-\d{2}$', identifier):
             # Unmark all backups from the given date
             date_str = identifier
@@ -490,8 +526,10 @@ class ServerAutomation:
                         unmarked_backups.append(unprotected_name)
             if unmarked_backups:
                 self.log_print(LogLevel.INFO, f"Unmarked backups from {date_str} as protected: {', '.join(unmarked_backups)}")
+                return f"Unmarked backups from {date_str} as protected: {', '.join(unmarked_backups)}"
             else:
                 self.log_print(LogLevel.WARN, f"No backups found from date {date_str} to unmark as protected.")
+                return f"No backups found from date {date_str} to unmark as protected."
         else:
             # Unmark a specific backup by name
             backup_path = backup_root / identifier
@@ -499,8 +537,10 @@ class ServerAutomation:
                 unprotected_name = backup_path.name[len(PROTECTED_BACKUP_PREFIX) + 1:]
                 backup_path.rename(backup_root / unprotected_name)
                 self.log_print(LogLevel.INFO, f"Unmarked backup as protected: {unprotected_name}")
+                return f"Unmarked backup as protected: {unprotected_name}"
             else:
                 self.log_print(LogLevel.WARN, f"Backup '{identifier}' not found to unmark as protected.")
+                return f"Backup '{identifier}' not found to unmark as protected."
 
 
     def switch_to_backup_world(self, backup_name):
@@ -513,7 +553,7 @@ class ServerAutomation:
             # Refuse to switch if the server is running
             if self.runner.is_running():
                 self.log_print(LogLevel.ERROR, "Cannot switch world while server is running.")
-                return False
+                return "Cannot switch world while server is running."
 
             # Prepare paths
             world_dir = Path(self.server_folder) / WORLDS_FOLDER_NAME / self.world_name
@@ -522,7 +562,7 @@ class ServerAutomation:
             # Check if the backup exists
             if not backup_path.exists():
                 self.log_print(LogLevel.ERROR, f"Backup '{backup_name}' does not exist.")
-                return False
+                return f"Backup '{backup_name}' does not exist."
 
             # Make an offline backup of the current world before switching and skip pruning to avoid deleting this backup (edge case)
             self.log_print(LogLevel.INFO, "Creating offline backup of current world before switching...")
@@ -534,7 +574,7 @@ class ServerAutomation:
                 shutil.rmtree(world_dir)
             except Exception as e:
                 self.log_print(LogLevel.ERROR, f"Failed to remove current world directory: {e}")
-                return False
+                return f"Failed to remove current world directory: {e}"
 
             # Restore the backup to the world directory
             self.log_print(LogLevel.INFO, f"Restoring backup '{backup_name}' to world directory '{world_dir.name}'...")
@@ -553,10 +593,10 @@ class ServerAutomation:
                     shutil.copytree(backup_path, world_dir)
             except Exception as e:
                 self.log_print(LogLevel.ERROR, f"Failed to restore backup '{backup_name}': {e}")
-                return False
+                return f"Failed to restore backup '{backup_name}': {e}"
 
             self.log_print(LogLevel.INFO, f"Successfully switched world to backup '{backup_name}'.")
-            return True
+            return f"Successfully switched world to backup '{backup_name}'."
 
 
     def check_for_updates(self):
@@ -704,7 +744,7 @@ class ServerAutomation:
         return True
 
 
-    def update_server(self):
+    def update_server(self, skip_world_backup: bool = False):
         """
         Update the Bedrock server to the latest version.
         Uses:
@@ -714,26 +754,27 @@ class ServerAutomation:
         Returns:
             bool: True if a world backup was created before the update attempt, False otherwise.
         """
-        # Verify the current version is known before proceeding with an update
-        server_dir = Path(self.server_folder)
-        if self.current_version is None:
-            self.log_print(LogLevel.ERROR, "Cannot check for updates: server version is unknown. Ensure the server has started successfully.")
-            return False
-
-        # Check for updates and get the download URL
-        updateInfo = get_bedrock_update_info(self.current_version, self.config.platform)
-        if updateInfo.error:
-            self.log_print(LogLevel.ERROR, f"Update check failed: {updateInfo.error}")
-            return False
-        elif not updateInfo.update_available:
-            self.log_print(LogLevel.INFO, f"No update available, you are running the latest version: {updateInfo.latest_version}.")
-            return False
 
         with self.runner.lock():
             # Refuse to update if the server is running
             if self.runner.is_running():
                 self.log_print(LogLevel.ERROR, "Cannot update server while it is running.")
-                return False
+                return "Cannot update server while it is running."
+            
+            # Verify the current version is known before proceeding with an update
+            server_dir = Path(self.server_folder)
+            if self.current_version is None:
+                self.log_print(LogLevel.ERROR, "Cannot check for updates: server version is unknown. Ensure the server has started successfully.")
+                return "Cannot check for updates: server version is unknown. Ensure the server has started successfully."
+
+            # Check for updates and get the download URL
+            updateInfo = get_bedrock_update_info(self.current_version, self.config.platform)
+            if updateInfo.error:
+                self.log_print(LogLevel.ERROR, f"Update check failed: {updateInfo.error}")
+                return "Update check failed."
+            elif not updateInfo.update_available:
+                self.log_print(LogLevel.INFO, f"No update available, you are running the latest version: {updateInfo.latest_version}.")
+                return "No update available."
 
             self.log_print(LogLevel.INFO, f"Updating server from version {self.current_version} to {updateInfo.latest_version}...")
 
@@ -742,11 +783,11 @@ class ServerAutomation:
             
             if not self._backup_world_offline(skip_pruning=True):
                 self.log_print(LogLevel.ERROR, "Failed to create world backup before update.")
-                return False
+                return "Failed to create world backup before update."
 
             if not self._backup_server_files(skip_pruning=True):
                 self.log_print(LogLevel.ERROR, "Failed to create server backup before update.")
-                return True
+                return "Failed to create server backup before update."
 
             # Prepare paths to update the bedrock server
             temp_dir = Path(f"{TEMPORARY_PREFIX}_bedrock_update")
@@ -779,12 +820,9 @@ class ServerAutomation:
                                         last_logged = percent
             except Exception as e:
                 # Clean temp if created
-                try:
-                    shutil.rmtree(temp_dir, ignore_errors=True)
-                except Exception:
-                    self.log_print(LogLevel.WARN, f"Failed to clean up temporary files after download failure: {temp_dir}")
+                shutil.rmtree(temp_dir, ignore_errors=True)
                 self.log_print(LogLevel.ERROR, f"Failed to download update: {e}")
-                return True
+                return "Failed to download update."
             self.log_print(LogLevel.INFO, "Download completed.")
 
             # Extract the downloaded files to the server folder (overwrite existing files)
@@ -792,14 +830,13 @@ class ServerAutomation:
 
             # Clean up the downloaded zip file and temporary directory
             self.log_print(LogLevel.INFO, "Cleaning up temporary files...")
-            try:
-                shutil.rmtree(temp_dir, ignore_errors=True)
-            except Exception as e:
-                self.log_print(LogLevel.WARN, f"Failed to clean up temporary files after update: {temp_dir}, error: {e}")
+            shutil.rmtree(temp_dir, ignore_errors=True)
 
+            # If the extraction failed, return an error message (log message is handled in the extraction method)
             if not success:
-                return True
+                return "Failed to extract update files. Server may be in a non-functional state, manual intervention may be required."
 
+            # Update the current version to the new version after a successful update
             self.current_version = updateInfo.latest_version
             self.log_print(LogLevel.INFO, f"Server updated successfully to version {updateInfo.latest_version}.")
-            return True
+            return "Server updated successfully."

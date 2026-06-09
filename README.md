@@ -9,7 +9,7 @@ It is designed to work as-is; however, the modularity of the code allows for ext
 - **Auto-install**: Downloads and extracts Bedrock server software automatically on first run.
 - **Configuration Validation**: Reads and validates all settings from `settings.toml`; missing or invalid entries are reported with clear, structured error output.
 - **Automation**: Daily scheduled restarts, automated world backups, crash detection and recovery, and automatic Bedrock server updates.
-- **Discord Bot Integration**: Manage and monitor your server using Discord commands (in development).
+- **Discord Bot Integration**: Manage and monitor your server using Discord commands.
 - **Logging**: All output is logged to daily `.txt` files in the configured log folder.
 - **Custom CLI**: Command-line interface for sending commands and viewing logs for the server manager, internal Bedrock server software, and Discord bot.
 - **Extensible Design**: Modular, publish-subscribe architecture designed for easy expansion.
@@ -42,8 +42,12 @@ Edit `settings.toml` to specify settings. Every required value is validated at s
 
 ```
 bedrock-server:
-  server_folder: must be a string representing a folder path
-  restart_time: 10:60: invalid time
+  config:
+    server_folder: must be a string representing a folder path
+    backup_duration: must be an integer
+    restart_time: 03T30: invalid time
+  main:
+    exited cleanly
 ```
 
 ### Settings Reference
@@ -65,6 +69,7 @@ bedrock-server:
 | `update_backup_paths` | list of strings \| `"all"` | Server files/folders to back up before an update. Use `"all"` to back up the entire server folder. Worlds are always backed up separately. |
 | `platform` | string | `"Windows"` or `"Linux"`. Auto-detected if not set. |
 | `world_name` | string | World name. Auto-detected from `server.properties` if not set. |
+| `[[custom_commands]]` | array of tables | Optional custom Discord bot commands. Must be placed at the end of the file. See [Custom Discord Commands](#custom-discord-commands). |
 
 Settings related to the internal Minecraft Bedrock server (e.g. game mode, difficulty) can be found in the `server.properties` file in the server folder.
 
@@ -96,20 +101,46 @@ Commands prefixed with `:` are built-in CLI commands. Any other input is forward
 
 ### Discord Bot Commands
 
-The Discord bot uses `!` as its command prefix. Bot commands are currently in development.
+The Discord bot uses `!` as its command prefix.
 
 | Command | Access | Description |
 |---|---|---|
 | `!help` | Everyone | Show all available commands. |
 | `!online` | Everyone | Show who is currently online. |
-| `!stop` | Admin | Stop the server. |
 | `!start` | Admin | Start the server. |
+| `!stop` | Admin | Stop the server. |
 | `!restart` | Admin | Restart the server. |
-| `!save` | Admin | Save the world while the server is running. |
-| `!check_for_update` | Admin | Check for a server software update. |
-| `!difficulty` | Admin | Set the game difficulty. |
-| `!coords` | Admin | Set coordinates. |
-| `!god` | Bot Owner | Access the server command-line. |
+| `!backup` | Admin | Create a world backup. |
+| `!list` | Admin | List existing backups. |
+| `!mark <backup_name \| latest \| YYYY-MM-DD>` | Admin | Protect backup(s) from automatic deletion. |
+| `!unmark <backup_name \| latest \| YYYY-MM-DD>` | Admin | Unprotect backup(s) from automatic deletion. |
+| `!switch <backup_name>` | Admin | Switch the world to the specified backup (server must be stopped). |
+| `!check` | Admin | Check for a Bedrock server update. |
+| `!update` | Admin | Update the Bedrock server to the latest version (server must be stopped). |
+| `!cmd` | Bot Owner | Enter an interactive session with the server command-line. |
+
+### Custom Discord Commands
+
+Additional Discord commands can be defined in `settings.toml` using `[[custom_commands]]` blocks. Each block must be placed at the end of the file (after all other settings) and requires the following fields:
+
+| Field | Type | Description |
+|---|---|---|
+| `name` | string | Command name (lowercase letters, numbers, `_`, `-` only). Cannot conflict with built-in commands. |
+| `command` | string | Server command to run when the Discord command is invoked. |
+| `admin` | boolean | Whether the command requires admin privileges. |
+| `description` | string | Description shown in `!help`. |
+| `response` | string | Message sent back to Discord after the command runs. |
+
+Example:
+
+```toml
+[[custom_commands]]
+name = "coordson"
+command = "gamerule showcoordinates true"
+admin = true
+description = "Enable show coordinates."
+response = "Coordinates enabled."
+```
 
 ## Error Handling
 

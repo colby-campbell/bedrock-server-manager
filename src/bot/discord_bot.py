@@ -1,11 +1,20 @@
-from utils import BroadcastHandler, LineBroadcaster
+from utils import BroadcastHandler, LineBroadcaster, LogLevel
 import asyncio
 import discord
 import logging
 from discord.ext import commands
 
+# Constants
+BLOCKED_COMMANDS = {
+        'stop': 'stop',
+        'start': 'start',
+        'restart': 'restart',
+        'list': 'online',
+        'save': 'backup'
+    }
 
-## Command to check if the user has admin privileges
+
+# Command to check if the user has admin privileges
 def is_admin(admin_ids):
     async def predicate(ctx):
         # Check if the user is an admin or the bot owner
@@ -20,17 +29,18 @@ class DiscordBot:
     """
     Discord bot for managing a Minecraft Bedrock server.
     """
-    def __init__(self, config, server, automation):
+    def __init__(self, config, runner, automation):
         """
         Initialize the DiscordBot with configuration, server runner, and automation instances.
         Args:
             config (ServerConfig): The server configuration instance.
-            server (ServerRunner): The server runner instance.
+            runner (ServerRunner): The server runner instance.
             automation (ServerAutomation): The server automation instance.
         """
         self.admin_list = config.admins
         self.token = config.bot_token
-        self.server = server
+        self.custom_commands = config.custom_commands
+        self.runner = runner
         self.automation = automation
         self.broadcaster = LineBroadcaster()
         # Create a custom broadcast handler for logging
@@ -40,6 +50,7 @@ class DiscordBot:
         intents = discord.Intents.default()
         intents.message_content = True
         self.bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
+        self.running = False
 
     def discord_bot_start(self):
         """Start the Discord bot and register commands."""
@@ -55,87 +66,218 @@ class DiscordBot:
             embed.add_field(
                 name="Bot Owner Commands",
                 value="\n".join([
-                    "`!god` — Allows access to the command-line of the server software."
+                    "`!cmd` - Allows access to the command-line of the internal Minecraft Bedrock server."
                 ])
             )
 
-            embed.add_field(
-                name="Admin Commands",
-                value="\n".join([
-                    "`!stop` — Stop the server.",
-                    "`!start` — Start the server.",
-                    "`!restart` — Restart the server.",
-                    "`!save` — Save the world while the server is still running.",
-                    "`!check_for_update` — Checks for an update for the server software."
-                    "`!difficulty` — Set the difficulty.",
-                    "`!coords` — Set coordinates.",
-                ]),
-                inline=False
-            )
+            admin_lines = [
+                "`!start` - Start the Minecraft Bedrock server.",
+                "`!stop` - Stop the server.",
+                "`!restart` - Restart the server.",
+                "`!backup` - Create a world backup.",
+                "`!list` - List existing backups.",
+                "`!mark <backup_name | latest | YYYY-MM-DD>` - Protect backup(s) from automatic deletion.",
+                "`!unmark <backup_name | latest | YYYY-MM-DD>` - Unprotect backup(s) from automatic deletion.",
+                "`!switch <backup_name>` - Switch the world to the specified backup.",
+                "`!check` - Check for Bedrock server updates.",
+                "`!update` - Update the Bedrock server to the latest version.",
+                *[f"`!{c['name']}` - {c['description']}" for c in self.custom_commands if c["admin"]]
+            ]
+            embed.add_field(name="Admin Commands", value="\n".join(admin_lines), inline=False)
 
-            embed.add_field(
-                name="General Commands",
-                value="\n".join([
-                    "`!help` — Show this message.",
-                    "`!online` — Show who is online."
-                ]),
-                inline=False
-            )
+            general_lines = [
+                "`!help` - Show this message.",
+                "`!online` - Show who is online.",
+                *[f"`!{c['name']}` - {c['description']}" for c in self.custom_commands if not c["admin"]]
+            ]
+            embed.add_field(name="General Commands", value="\n".join(general_lines), inline=False)
 
             await ctx.send(embed=embed)
 
+        # Bot owner command
         @commands.is_owner()
-        @self.bot.command(name="god")
-        async def discord_god(ctx):
-            print("God command invoked")
+        @self.bot.command(name="cmd")
+        async def discord_cmd(ctx):
+            queue = asyncio.Queue()
+
+            def on_server_output(_timestamp, line):
+                queue.put_nowait(line)
+
+            self.automation.log_print(LogLevel.INFO, f"cmd mode started by {ctx.author}.")
+            self.runner.stdout_broadcaster.subscribe(on_server_output)
+            await ctx.send("Entered cmd mode. Type `exit` to quit. Times out after 60s of inactivity.")
+
+            async def flush_queue():
+                lines = []
+                try:
+                    while True:
+                        line = await asyncio.wait_for(queue.get(), timeout=0.5)
+                        lines.append(line)
+                except asyncio.TimeoutError:
+                    pass
+                if lines:
+                    await ctx.send(f"```{''.join(lines)}```")
+
+            try:
+                while True:
+                    msg = await self.bot.wait_for(
+                        'message',
+                        check=lambda m: m.author == ctx.author and m.channel == ctx.channel,
+                        timeout=60.0
+                    )
+                    # Check for exit commands
+                    words = msg.content.lower().split()
+                    if words and words[0] in ("exit", "quit"):
+                        self.automation.log_print(LogLevel.INFO, f"cmd mode exited by {ctx.author}.")
+                        await ctx.send("Exiting cmd mode.")
+                        break
+                    # Check for blocked commands
+                    if words and words[0] in BLOCKED_COMMANDS:
+                        await ctx.send(f"Command '{words[0]}' is blocked. Use command '!{BLOCKED_COMMANDS[words[0]]}' outside of cmd mode.")
+                        continue
+                    self.automation.log_print(LogLevel.INFO, f"cmd mode command by {ctx.author}: {msg.content}")
+                    self.runner.send_command(msg.content)
+                    await flush_queue()
+            except asyncio.TimeoutError:
+                self.automation.log_print(LogLevel.INFO, f"cmd mode timed out for {ctx.author}.")
+                await ctx.send("cmd mode timed out due to inactivity.")
+            finally:
+                self.runner.stdout_broadcaster.unsubscribe(on_server_output)
+
+        # Admin commands
+        @is_admin(self.admin_list)
+        @self.bot.command(name="start")
+        async def discord_start(ctx):
+            self.automation.log_print(LogLevel.INFO, f"!start invoked by {ctx.author}.")
+            if self.runner.is_running():
+                await ctx.send("Server is already running.")
+            else:
+                await ctx.send("Server is starting...")
+                self.runner.start()
+                await ctx.send("Server started.")
 
         @is_admin(self.admin_list)
         @self.bot.command(name="stop")
         async def discord_stop(ctx):
-            print("Stop command invoked")
-
-        @is_admin(self.admin_list)
-        @self.bot.command(name="start")
-        async def discord_start(ctx):
-            print("Start command invoked")
+            self.automation.log_print(LogLevel.INFO, f"!stop invoked by {ctx.author}.")
+            if self.runner.is_running():
+                await ctx.send("Server is stopping...")
+                self.runner.stop()
+                await ctx.send("Server stopped.")
+            else:
+                await ctx.send("Server is not running.")
 
         @is_admin(self.admin_list)
         @self.bot.command(name="restart")
         async def discord_restart(ctx):
-            print("Restart command invoked")
+            self.automation.log_print(LogLevel.INFO, f"!restart invoked by {ctx.author}.")
+            if self.runner.is_running():
+                await ctx.send("Server is restarting...")
+                self.runner.restart()
+                await ctx.send("Server restarted.")
+            else:
+                await ctx.send("Server is not running, starting server...")
+                self.runner.start()
 
         @is_admin(self.admin_list)
-        @self.bot.command(name="save")
-        async def discord_save(ctx):
-            print("Save command invoked")
+        @self.bot.command(name="backup")
+        async def discord_backup(ctx):
+            self.automation.log_print(LogLevel.INFO, f"!backup invoked by {ctx.author}.")
+            await ctx.send("Starting world backup...")
+            self.automation.smart_backup()
+            await ctx.send("World backup completed.")
+            
+        @is_admin(self.admin_list)
+        @self.bot.command(name="list")
+        async def discord_list(ctx):
+            self.automation.log_print(LogLevel.INFO, f"!list invoked by {ctx.author}.")
+            result = self.automation.list_backups()
+            await ctx.send(result)
 
         @is_admin(self.admin_list)
-        @self.bot.command(name="check_for_update")
-        async def discord_check_for_update(ctx):
-            print("Check for update command invoked")
+        @self.bot.command(name="mark")
+        async def discord_mark(ctx, *, identifier: str):
+            self.automation.log_print(LogLevel.INFO, f"!mark invoked by {ctx.author}.")
+            result = self.automation.mark_backup(identifier)
+            await ctx.send(result)
 
         @is_admin(self.admin_list)
-        @self.bot.command(name="difficulty")
-        async def discord_difficulty(ctx):
-            print("Difficulty command invoked")
+        @self.bot.command(name="unmark")
+        async def discord_unmark(ctx, *, identifier: str):
+            self.automation.log_print(LogLevel.INFO, f"!unmark invoked by {ctx.author}.")
+            result = self.automation.unmark_backup(identifier)
+            await ctx.send(result)
 
-        @self.bot.command(name="coords")
-        async def discord_coords(ctx):
-            print("Coords command invoked")
+        @is_admin(self.admin_list)
+        @self.bot.command(name="switch")
+        async def discord_switch(ctx, *, identifier: str):
+            self.automation.log_print(LogLevel.INFO, f"!switch invoked by {ctx.author}.")
+            await ctx.send("Switching world to specified backup...")
+            result = self.automation.switch_to_backup_world(identifier)
+            await ctx.send(result)
 
+        @is_admin(self.admin_list)
+        @self.bot.command(name="check")
+        async def discord_check(ctx):
+            self.automation.log_print(LogLevel.INFO, f"!check invoked by {ctx.author}.")
+            result = self.automation.check_for_updates()
+            await ctx.send(result)
+
+        @is_admin(self.admin_list)
+        @self.bot.command(name="update")
+        async def discord_update(ctx):
+            self.automation.log_print(LogLevel.INFO, f"!update invoked by {ctx.author}.")
+            await ctx.send("Updating server to latest version...")
+            result = self.automation.update_server()
+            await ctx.send(result)
+
+        # General commands that don't require admin privileges
         @self.bot.command(name="online")
         async def discord_online(ctx):
-            print("Online command invoked")
+            self.automation.log_print(LogLevel.INFO, f"!online invoked by {ctx.author}.")
+            result = self.automation.get_online_players()
+            await ctx.send(result)
 
         @self.bot.event
         async def on_command_error(ctx, error):
             if isinstance(error, commands.errors.CheckFailure):
+                self.automation.log_print(LogLevel.WARN, f"Permission denied for {ctx.author} on command !{ctx.command}.")
                 await ctx.send("You do not have the permissions to use this command.")
+            elif isinstance(error, commands.errors.MissingRequiredArgument):
+                usage = {
+                    "mark": "Usage: `!mark <backup_name | latest | YYYY-MM-DD>`",
+                    "unmark": "Usage: `!unmark <backup_name | latest | YYYY-MM-DD>`",
+                    "switch": "Usage: `!switch <backup_name>`",
+                }
+                msg = usage.get(ctx.command.name, f"Usage: `!{ctx.command.name}` requires an argument.")
+                await ctx.send(msg)
+            elif isinstance(error, commands.errors.CommandInvokeError):
+                self.automation.log_print(LogLevel.ERROR, f"!{ctx.command} raised an error: {error.original}")
+                await ctx.send(f"An error occurred, contact the server administrator.")
+
+        # Register custom commands from config
+        for entry in self.custom_commands:
+            def make_handler(cmd_str, cmd_name, cmd_response):
+                async def handler(_ctx):
+                    self.automation.log_print(LogLevel.INFO, f"!{cmd_name} invoked by {_ctx.author}.")
+                    self.runner.send_command(cmd_str)
+                    await _ctx.send(cmd_response)
+                return handler
+            cmd = commands.Command(make_handler(entry["command"], entry["name"], entry["response"]), name=entry["name"], help=entry["description"])
+            if entry["admin"]:
+                cmd.add_check(is_admin(self.admin_list).predicate)
+            self.bot.add_command(cmd)
 
         # Start the discord bot with custom logging
-        self.bot.run(self.token, log_handler=self.broadcast_handler, log_formatter=self.log_formatter)
+        self.running = True
+        try:
+            self.bot.run(self.token, log_handler=self.broadcast_handler, log_formatter=self.log_formatter)
+        except Exception as e:
+            self.automation.log_print(LogLevel.ERROR, f"Error starting Discord bot: {e}")
+        self.running = False
 
     def discord_bot_stop(self):
         """Stop the Discord bot."""
         # To shut down properly, schedule the close coroutine on the event loop
+        # This isn't really necessary since the bot will shut down when the main process exits, but hey shi idk gang
         asyncio.run_coroutine_threadsafe(self.bot.close(), self.bot.loop)
