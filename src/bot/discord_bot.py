@@ -29,18 +29,18 @@ class DiscordBot:
     """
     Discord bot for managing a Minecraft Bedrock server.
     """
-    def __init__(self, config, server, automation):
+    def __init__(self, config, runner, automation):
         """
         Initialize the DiscordBot with configuration, server runner, and automation instances.
         Args:
             config (ServerConfig): The server configuration instance.
-            server (ServerRunner): The server runner instance.
+            runner (ServerRunner): The server runner instance.
             automation (ServerAutomation): The server automation instance.
         """
         self.admin_list = config.admins
         self.token = config.bot_token
         self.custom_commands = config.custom_commands
-        self.server = server
+        self.runner = runner
         self.automation = automation
         self.broadcaster = LineBroadcaster()
         # Create a custom broadcast handler for logging
@@ -104,7 +104,7 @@ class DiscordBot:
                 queue.put_nowait(line)
 
             self.automation.log_print(LogLevel.INFO, f"cmd mode started by {ctx.author}.")
-            self.server.stdout_broadcaster.subscribe(on_server_output)
+            self.runner.stdout_broadcaster.subscribe(on_server_output)
             await ctx.send("Entered cmd mode. Type `exit` to quit. Times out after 60s of inactivity.")
 
             async def flush_queue():
@@ -136,13 +136,13 @@ class DiscordBot:
                         await ctx.send(f"Command '{words[0]}' is blocked. Use command '!{BLOCKED_COMMANDS[words[0]]}' outside of cmd mode.")
                         continue
                     self.automation.log_print(LogLevel.INFO, f"cmd mode command by {ctx.author}: {msg.content}")
-                    self.server.send_command(msg.content)
+                    self.runner.send_command(msg.content)
                     await flush_queue()
             except asyncio.TimeoutError:
                 self.automation.log_print(LogLevel.INFO, f"cmd mode timed out for {ctx.author}.")
                 await ctx.send("cmd mode timed out due to inactivity.")
             finally:
-                self.server.stdout_broadcaster.unsubscribe(on_server_output)
+                self.runner.stdout_broadcaster.unsubscribe(on_server_output)
 
         # Admin commands
         @is_admin(self.admin_list)
@@ -153,7 +153,7 @@ class DiscordBot:
                 await ctx.send("Server is already running.")
             else:
                 await ctx.send("Server is starting...")
-                self.runner.start_server()
+                self.runner.start()
                 await ctx.send("Server started.")
 
         @is_admin(self.admin_list)
@@ -162,7 +162,7 @@ class DiscordBot:
             self.automation.log_print(LogLevel.INFO, f"!stop invoked by {ctx.author}.")
             if self.runner.is_running():
                 await ctx.send("Server is stopping...")
-                self.runner.stop_server()
+                self.runner.stop()
                 await ctx.send("Server stopped.")
             else:
                 await ctx.send("Server is not running.")
@@ -212,6 +212,7 @@ class DiscordBot:
         @self.bot.command(name="switch")
         async def discord_switch(ctx, *, identifier: str):
             self.automation.log_print(LogLevel.INFO, f"!switch invoked by {ctx.author}.")
+            await ctx.send("Switching world to specified backup...")
             result = self.automation.switch_to_backup_world(identifier)
             await ctx.send(result)
 
@@ -226,6 +227,7 @@ class DiscordBot:
         @self.bot.command(name="update")
         async def discord_update(ctx):
             self.automation.log_print(LogLevel.INFO, f"!update invoked by {ctx.author}.")
+            await ctx.send("Updating server to latest version...")
             result = self.automation.update_server()
             await ctx.send(result)
 
@@ -233,7 +235,7 @@ class DiscordBot:
         @self.bot.command(name="online")
         async def discord_online(ctx):
             self.automation.log_print(LogLevel.INFO, f"!online invoked by {ctx.author}.")
-            result = self.automation.list_online_players()
+            result = self.automation.get_online_players()
             await ctx.send(result)
 
         @self.bot.event
@@ -252,11 +254,12 @@ class DiscordBot:
 
         # Register custom commands from config
         for entry in self.custom_commands:
-            def make_handler(cmd_str):
+            def make_handler(cmd_str, cmd_name):
                 async def handler(_ctx):
-                    self.server.send_command(cmd_str)
+                    self.automation.log_print(LogLevel.INFO, f"!{cmd_name} invoked by {_ctx.author}.")
+                    self.runner.send_command(cmd_str)
                 return handler
-            cmd = commands.Command(make_handler(entry["command"]), name=entry["name"], help=entry["description"])
+            cmd = commands.Command(make_handler(entry["command"], entry["name"]), name=entry["name"], help=entry["description"])
             if entry["admin"]:
                 cmd.add_check(is_admin(self.admin_list).predicate)
             self.bot.add_command(cmd)
