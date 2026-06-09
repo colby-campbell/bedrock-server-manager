@@ -121,9 +121,9 @@ class ServerConfig:
     # Required only if discord_bot=true
 
     admin_list=[]
-    # List of Discord user IDs with admin privileges.
+    # List of Discord user IDs with admin privileges, bot owners are always admins.
     # Allowed Values: [integer, integer, ...]
-    # Required only if discord_bot=true
+    # Used only if discord_bot=true
 
     # custom_commands (optional)
     # List of custom commands to be added to the Discord bot, each with a name, command, admin requirement, and description.

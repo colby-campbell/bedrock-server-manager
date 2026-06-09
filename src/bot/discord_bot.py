@@ -50,6 +50,7 @@ class DiscordBot:
         intents = discord.Intents.default()
         intents.message_content = True
         self.bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
+        self.running = False
 
     def discord_bot_start(self):
         """Start the Discord bot and register commands."""
@@ -261,7 +262,12 @@ class DiscordBot:
             self.bot.add_command(cmd)
 
         # Start the discord bot with custom logging
-        self.bot.run(self.token, log_handler=self.broadcast_handler, log_formatter=self.log_formatter)
+        self.running = True
+        try:
+            self.bot.run(self.token, log_handler=self.broadcast_handler, log_formatter=self.log_formatter)
+        except Exception as e:
+            self.automation.log_print(LogLevel.ERROR, f"Error starting Discord bot: {e}")
+        self.running = False
 
     def discord_bot_stop(self):
         """Stop the Discord bot."""

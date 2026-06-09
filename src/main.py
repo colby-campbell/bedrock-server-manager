@@ -18,7 +18,7 @@ output_handler = ServerOutput()
 
 def cleanup():
     """Cleanup function to ensure server and bot are shut down on exit."""
-    if bot is not None:
+    if bot is not None and bot.running:
         output_handler.add_message("stopping Discord bot before exit...", "main")
         bot.discord_bot_stop()
     if runner is not None and runner.is_running():
