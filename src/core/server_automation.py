@@ -160,6 +160,35 @@ class ServerAutomation:
                 # Start the server again
                 self.runner.start()
 
+    
+    def get_online_players(self):
+        """Get the list of online players from the server."""
+        with self.runner.lock():
+            if self.runner.is_running():
+                try:
+                    self.runner.send_command("list")
+                except RuntimeError:
+                    self.log_print(LogLevel.ERROR, "Failed to send 'list' command: server is not running.")
+                    return "No online players (server is offline)."
+                # Wait briefly for output to be processed to the deque buffer
+                sleep(0.25)
+                # Look for the line that starts with "There are X/Y players online:" and extract the player list from the preceding lines
+                for index, line in enumerate(self._recent_lines):
+                    match = re.search(r"There are (\d+)\/(\d+) players online:", line)
+                    if match:
+                        player_count = int(match.group(1))
+                        max_players = int(match.group(2))
+                        if player_count == 0:
+                            return f"There are 0/{max_players} players online."
+                        else:
+                            # Player names follow the header in server output, so they sit at lower indices (newer) in the newest-first deque
+                            players = []
+                            for i in range(index - player_count, index):
+                                players.append(self._recent_lines[i].strip())
+                            return f"There are {player_count}/{max_players} players online: {', '.join(players)}"
+            else:
+                return "No online players (server is offline)."
+
 
     def _prune_old_backups(self, backup_root: Path):
         """

@@ -232,6 +232,8 @@ class DiscordBot:
         @self.bot.command(name="online")
         async def discord_online(ctx):
             self.automation.log_print(LogLevel.INFO, f"!online invoked by {ctx.author}.")
+            result = self.automation.list_online_players()
+            await ctx.send(result)
 
         @self.bot.event
         async def on_command_error(ctx, error):

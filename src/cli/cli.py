@@ -10,7 +10,6 @@ BLOCKED_COMMANDS = {
         'restart': 'restart',
         'exit': 'exit',
         'quit': 'quit',
-        'list': 'online',
         'save': 'backup'
     }
 
@@ -164,7 +163,8 @@ class CommandLineInterface:
                 # Online
                 elif cmd == 'online':
                     if self.runner.is_running():
-                        self.automation.get_online_players()
+                        result = self.automation.get_online_players()
+                        self.just_print(result)
                     else:
                         self.log_print("Server is not running.")
                 # Stop
