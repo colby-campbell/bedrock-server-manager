@@ -104,9 +104,7 @@ class ServerAutomation:
         self.recent_crashes.append(now)
         crash_detection_window = now - timedelta(minutes=CRASH_DETECTION_WINDOW_MINUTES)
         # If any of the timestamps are older than the CRASH_DETECTION_WINDOW_MINUTES minutes, remove them
-        for time in self.recent_crashes:
-            if time < crash_detection_window:
-                self.recent_crashes.pop()
+        self.recent_crashes = [t for t in self.recent_crashes if t >= crash_detection_window]
         # If the length is larger than the crash limit, send an error and do not restart the server
         if len(self.recent_crashes) >= self.crash_limit:
             self.log_print(LogLevel.CRITICAL, "Repeated unexpected shutdowns detected. Crash limit exceeded. Server restart attempts halted until manual intervention.")
