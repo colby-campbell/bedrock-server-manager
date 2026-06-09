@@ -4,8 +4,17 @@ import discord
 import logging
 from discord.ext import commands
 
+# Constants
+BLOCKED_COMMANDS = {
+        'stop': 'stop',
+        'start': 'start',
+        'restart': 'restart',
+        'list': 'online',
+        'save': 'backup'
+    }
 
-## Command to check if the user has admin privileges
+
+# Command to check if the user has admin privileges
 def is_admin(admin_ids):
     async def predicate(ctx):
         # Check if the user is an admin or the bot owner
@@ -115,10 +124,16 @@ class DiscordBot:
                         check=lambda m: m.author == ctx.author and m.channel == ctx.channel,
                         timeout=60.0
                     )
-                    if msg.content.lower() == "exit":
+                    # Check for exit commands
+                    words = msg.content.lower().split()
+                    if words and words[0] in ("exit", "quit"):
                         self.automation.log_print(LogLevel.INFO, f"cmd mode exited by {ctx.author}.")
                         await ctx.send("Exiting cmd mode.")
                         break
+                    # Check for blocked commands
+                    if words and words[0] in BLOCKED_COMMANDS:
+                        await ctx.send(f"Command '{words[0]}' is blocked. Use command '!{BLOCKED_COMMANDS[words[0]]}' outside of cmd mode.")
+                        continue
                     self.automation.log_print(LogLevel.INFO, f"cmd mode command by {ctx.author}: {msg.content}")
                     self.server.send_command(msg.content)
                     await flush_queue()

@@ -3,6 +3,17 @@ from prompt_toolkit.patch_stdout import patch_stdout
 from utils import get_timestamp
 import re
 
+# Constants
+BLOCKED_COMMANDS = {
+        'stop': 'stop',
+        'start': 'start',
+        'restart': 'restart',
+        'exit': 'exit',
+        'quit': 'quit',
+        'list': 'online',
+        'save': 'backup'
+    }
+
 
 def add_colour(prefix, message):
     """Process a line from the server."""
@@ -41,8 +52,6 @@ class CommandLineInterface:
     """
     Command-Line Interface for interacting with the Minecraft Bedrock server.
     """
-
-    BLOCKED_COMMANDS = {'stop', 'start', 'restart', 'exit', 'quit'}
 
     def __init__(self, config, runner, automation, bot):
         """
@@ -135,6 +144,7 @@ class CommandLineInterface:
                     help_text = """
                     Built-in commands (prefix with ':'):
                     :help          Show this help message
+                    :online        Show online players
                     :start         Start the Minecraft Bedrock server
                     :stop          Stop the server
                     :restart       Restart the server
@@ -151,6 +161,12 @@ class CommandLineInterface:
                     :exit, :quit   Exit the CLI (and stop the server if running)
                     """
                     self.just_print(help_text.strip())
+                # Online
+                elif cmd == 'online':
+                    if self.runner.is_running():
+                        self.automation.get_online_players()
+                    else:
+                        self.log_print("Server is not running.")
                 # Stop
                 elif cmd == 'stop':
                     if self.runner.is_running():
@@ -239,8 +255,8 @@ class CommandLineInterface:
             else:
                 # Block blocked CLI commands without prefix
                 words = input_text.lower().split()
-                if words and words[0] in self.BLOCKED_COMMANDS:
-                    self.just_print(f"Command '{words[0]}' is blocked. Use built-in CLI command ':{words[0]}' instead.")
+                if words and words[0] in BLOCKED_COMMANDS:
+                    self.just_print(f"Command '{words[0]}' is blocked. Use built-in CLI command ':{BLOCKED_COMMANDS[words[0]]}' instead.")
                 # Special case of giving a hint for the 'help' command if the user types it without the prefix
                 elif len(words) == 1 and words[0] == "help":
                     self.just_print("You are passing input for the bedrock server itself, if you want to see the CLI built-in commands, type ':help'.")
