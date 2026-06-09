@@ -7,21 +7,13 @@ class Broadcaster:
         """Initialize the Broadcaster with an empty list of subscribers."""
         self.subscribers = []
 
-    class Priority(Enum):
-        """Priority levels for subscribers."""
-        HIGH = 1
-        MEDIUM = 2
-        LOW = 3
-
-    def subscribe(self, callback, priority = Priority.MEDIUM):
+    def subscribe(self, callback):
         """
         Register a new subscriber to be called upon.
         Args:
             callback (func): Function to add to the subscribe list.
         """
         self.subscribers.append(callback)
-        # Sort subscribers based on priority
-        self.subscribers.sort(key=lambda x: priority.value)
 
     def unsubscribe(self, callback):
         """
