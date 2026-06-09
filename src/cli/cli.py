@@ -179,7 +179,8 @@ class CommandLineInterface:
                     self.automation.smart_backup()
                 # List
                 elif cmd == 'list':
-                    self.automation.list_backups()
+                    result = self.automation.list_backups()
+                    self.just_print(result)
                 # Mark
                 elif cmd.startswith('mark'):
                     args = cmd.split(maxsplit=1)

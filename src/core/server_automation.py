@@ -400,9 +400,9 @@ class ServerAutomation:
                     backups.append(backup.name)
         if backups:
             # TODO: Format output better
-            self.log_print(LogLevel.INFO, f"Existing backups: {', '.join(backups)}")
+            return f"Existing backups: {', '.join(backups)}"
         else:
-            self.log_print(LogLevel.INFO, "No backups found.")
+            return "No backups found."
 
 
     def mark_backup(self, identifier):
