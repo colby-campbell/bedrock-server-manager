@@ -148,15 +148,18 @@ class ServerAutomation:
             self.log_print(LogLevel.INFO, "Performing scheduled server restart now.")
 
             with self.runner.lock():
-                # Stop the server if it running
-                if self.runner.is_running():
-                    self.runner.stop()
-                # Perform a world backup
-                self._backup_world_offline()
-                # If auto-update is enabled in config, check for a server update (skipping the world backup)
-                self.update_server(skip_world_backup=True)
-                # Start the server again
-                self.runner.start()
+                try:
+                    # Stop the server if it running
+                    if self.runner.is_running():
+                        self.runner.stop()
+                    # Perform a world backup
+                    self._backup_world_offline()
+                    # If auto-update is enabled in config, check for a server update (skipping the world backup)
+                    self.update_server(skip_world_backup=True)
+                    # Start the server again
+                    self.runner.start()
+                except Exception as e:
+                    self.log_print(LogLevel.ERROR, f"Scheduled restart failed: {e}")
 
     
     def get_online_players(self):
