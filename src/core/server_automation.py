@@ -6,7 +6,7 @@ from time import sleep, strftime, time
 import threading
 import shutil
 import zipfile
-from collections import deque
+import queue
 import re
 
 # Constants
@@ -49,8 +49,6 @@ class ServerAutomation:
         self.logger = BufferedDailyLogger(self.config.log_folder)
         # Create a list of crashes
         self.recent_crashes = []
-        # Recent lines buffer for monitoring server output
-        self._recent_lines = deque(maxlen=DEQUE_MAX_LENGTH)
         self.current_version = None
 
 
@@ -86,7 +84,6 @@ class ServerAutomation:
         if (line.startswith("Version:")):
             self.current_version = line.split("Version:")[1].strip()
         self.logger.log(timestamp + line)
-        self._recent_lines.appendleft(line)
 
 
     def handle_unexpected_shutdown(self, timestamp, line):
@@ -320,35 +317,62 @@ class ServerAutomation:
             # Step 2: save query
             hold_confirmed = False
             hold_deadline = time() + SAVE_QUERY_TIMEOUT_SECONDS
-            success_index = -1
-            while time() < hold_deadline and not hold_confirmed:
-                # Run the save query command
-                try:
-                    self.runner.send_command("save query")
-                except RuntimeError:
-                    self.log_print(LogLevel.ERROR, f"Failed to send 'save query': server is not running.")
-                    return None
-                # Wait briefly for output to be processed to the deque buffer
-                sleep(0.25)
-                # Look through dequeue or a confirmation or failure pattern
-                for index, line in enumerate(self._recent_lines):
-                    if re.search(SUCCESS_PATTERN, line, re.IGNORECASE):
-                        success_index = index
-                        hold_confirmed = True
-                    elif re.search(FAIL_PATTERN, line, re.IGNORECASE):
-                        continue
-            # If hold was not confirmed, log a warning
-            if not hold_confirmed:
-                self.log_print(LogLevel.WARN, "Save query failed; aborting backup.")
-                try:
-                    self.runner.send_command("save resume")
-                except RuntimeError:
-                    self.log_print(LogLevel.ERROR, "Save resume failed, server may still be in hold state.")
-                return None
+            file_list_line = None
 
-            # Extract file list from the output line preceding the success line
+            # Temporarily subscribe to stdout to monitor for the success or failure of the save query command
+            stdout_queue = queue.Queue()
+            def queue_server_output(_, line):
+                stdout_queue.put(line)
+            self.runner.stdout_broadcaster.subscribe(queue_server_output)
+
+            try:
+                while time() < hold_deadline and not hold_confirmed:
+                    # Run the save query command
+                    try:
+                        self.runner.send_command("save query")
+                    except RuntimeError:
+                        self.log_print(LogLevel.ERROR, f"Failed to send 'save query': server is not running.")
+                        return None
+                    # Read lines from the queue until we see the success or failure pattern, or until we hit the timeout
+                    while True:
+                        try:
+                            line = stdout_queue.get(timeout=max(0.01, hold_deadline - time()))
+                            if re.search(SUCCESS_PATTERN, line, re.IGNORECASE):
+                                hold_confirmed = True
+                                break
+                            elif re.search(FAIL_PATTERN, line, re.IGNORECASE):
+                                # If we get a failure message, drain the queue and break to retry the save query command
+                                while not stdout_queue.empty():
+                                    stdout_queue.get_nowait()
+                                break
+                        except queue.Empty:
+                            break
+
+                # If hold was not confirmed, send save resume and abort
+                if not hold_confirmed:
+                    self.log_print(LogLevel.WARN, "Save query timed out; aborting backup.")
+                    try:
+                        self.runner.send_command("save resume")
+                    except RuntimeError:
+                        self.log_print(LogLevel.ERROR, "Save resume failed, server may still be in hold state.")
+                    return None
+
+                # The file list arrives on the line immediately after the success message
+                try:
+                    file_list_line = stdout_queue.get(timeout=1.0)
+                except queue.Empty:
+                    self.log_print(LogLevel.WARN, "Timed out waiting for file list after save query.")
+                    try:
+                        self.runner.send_command("save resume")
+                    except RuntimeError:
+                        self.log_print(LogLevel.ERROR, "Save resume failed, server may still be in hold state.")
+                    return None
+            finally:
+                self.runner.stdout_broadcaster.unsubscribe(queue_server_output)
+
+            # Extract file list from the line following the success message
             files = []
-            entries = self._recent_lines[success_index - 1].split(', ')
+            entries = file_list_line.split(', ')
             for entry in entries:
                 if ':' in entry:
                     path, size = entry.rsplit(':', 1)
