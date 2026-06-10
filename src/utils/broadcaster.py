@@ -1,4 +1,5 @@
 from enum import Enum
+import threading
 
 
 class Broadcaster:
@@ -6,6 +7,7 @@ class Broadcaster:
     def __init__(self):
         """Initialize the Broadcaster with an empty list of subscribers."""
         self.subscribers = []
+        self._lock = threading.Lock()
 
     def subscribe(self, callback):
         """
@@ -13,7 +15,8 @@ class Broadcaster:
         Args:
             callback (func): Function to add to the subscribe list.
         """
-        self.subscribers.append(callback)
+        with self._lock:
+            self.subscribers.append(callback)
 
     def unsubscribe(self, callback):
         """
@@ -21,7 +24,8 @@ class Broadcaster:
         Args:
             callback (func): Function to remove from the subscribe list.
         """
-        self.subscribers.remove(callback)
+        with self._lock:
+            self.subscribers.remove(callback)
 
 class LineBroadcaster(Broadcaster):
     def publish(self, timestamp, line):
@@ -30,11 +34,17 @@ class LineBroadcaster(Broadcaster):
         Args:
             line (str): Line to send to all subscribers
         """
-        for callback in self.subscribers:
+        # Create a shallow copy of the subscriber list so the lock can be released before calling callback functions
+        with self._lock:
+            callbacks = self.subscribers.copy()
+        for callback in callbacks:
             callback(timestamp, line)
 
 class SignalBroadcaster(Broadcaster):
     def publish(self):
         """Send an alert to all registered subscribers using their callback function."""
-        for callback in self.subscribers:
+        # Create a shallow copy of the subscriber list so the lock can be released before calling callback functions
+        with self._lock:
+            callbacks = self.subscribers.copy()
+        for callback in callbacks:
             callback()
