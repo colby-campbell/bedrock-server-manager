@@ -1,5 +1,6 @@
 from enum import Enum
 import threading
+from .format_helper import LogLevel
 
 
 class Broadcaster:
@@ -28,17 +29,20 @@ class Broadcaster:
             self.subscribers.remove(callback)
 
 class LineBroadcaster(Broadcaster):
-    def publish(self, timestamp, line):
+    def publish(self, level: LogLevel, timestamp: str, message: str, line: str):
         """
-        Send a line of output to all registered subscribers using their callback function.
+        Send the level, timestamp, message, and complete line of output to all registered subscribers using their callback function.
         Args:
-            line (str): Line to send to all subscribers
+            level (LogLevel): The log level.
+            timestamp (str): The timestamp.
+            message (str): The message.
+            line (str): The complete formatted line.
         """
         # Create a shallow copy of the subscriber list so the lock can be released before calling callback functions
         with self._lock:
             callbacks = self.subscribers.copy()
         for callback in callbacks:
-            callback(timestamp, line)
+            callback(level, timestamp, message, line)
 
 class SignalBroadcaster(Broadcaster):
     def publish(self):

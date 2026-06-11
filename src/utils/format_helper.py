@@ -1,10 +1,10 @@
 from datetime import datetime
 import enum
 import re
-from webbrowser import get
 
 # Constants
 SPACING_LENGTH = 9
+PROCESS_LINE_REGEX = re.compile(r"\[(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}[:,]\d{3}) (?P<level>\w+)\](?: (?P<message>.*))?")
 
 class LogLevel(enum.Enum):
     INFO = "INFO"
@@ -14,11 +14,13 @@ class LogLevel(enum.Enum):
     CRITICAL = "CRITICAL"
     RAW = "RAW"
     CLI = "CLI"
+    UNKNOWN = "UNKNOWN"
 
 
 def get_timestamp():
     """Get the current timestamp in the format YYYY-MM-DD HH:MM:SS:MMM"""
-    return datetime.now().strftime("%Y-%m-%d %H:%M:%S") + f":{datetime.now().microsecond // 1000:03d}"
+    now = datetime.now()
+    return now.strftime("%Y-%m-%d %H:%M:%S") + f":{now.microsecond // 1000:03d}"
 
 
 def get_spacing(level: LogLevel):
@@ -32,6 +34,17 @@ def get_spacing(level: LogLevel):
     return " " * (max(SPACING_LENGTH - len(level.value), 1))
 
 
+""" THIS WILL BE REMOVED
+def get_prefix(level: LogLevel):
+    # comment block start
+    Get the formatted prefix for a given log level.
+    Args:
+        level (LogLevel): The log level.
+    Returns:
+        str: The formatted prefix string.
+    # comment block end
+    return f"{get_timestamp()} {level.value}{get_spacing(level)}"
+"""
 def get_prefix(level: LogLevel):
     """
     Get the formatted prefix for a given log level.
@@ -43,17 +56,19 @@ def get_prefix(level: LogLevel):
     return f"{get_timestamp()} {level.value}{get_spacing(level)}"
 
 
-def process_line(line):
+def process_line(line: str):
     """
     Process a line from the server.
     Args:
         line (str): The line to process.
     Returns:
-        list[str]: A list containing the formatted prefix and the message.
+        level (LogLevel): The log level.
+        timestamp (str): The timestamp.
+        message (str): The message.
+        line (str): The complete formatted line.
     """
     # Regex to parse log lines
-    pattern = re.compile(r"\[(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}[:,]\d{3}) (?P<level>\w+)\](?: (?P<message>.*))?")
-    match = pattern.match(line)
+    match = PROCESS_LINE_REGEX.match(line)
     if match:
         timestamp = match.group("timestamp")
         # Replace comma with colon in timestamp for consistency
@@ -64,7 +79,28 @@ def process_line(line):
         # Get the message part ('or ""' to handle None case)
         message = match.group("message") or ""
         # Return the formatted line
-        return [f"{timestamp} {level}{spacing}", message]
+        try:
+            level_enum = LogLevel[match.group("level")]
+        except KeyError:
+            level_enum = LogLevel.UNKNOWN
+        return level_enum, timestamp, message, f"{timestamp} {level}{spacing}{message}"
     else:
-        # If the line doesn't contain a timestamp, return it with an 'RAW' level
-        return [f"{get_timestamp()} RAW{get_spacing(LogLevel.RAW)}", line]
+        # If the line doesn't contain a timestamp, return it with a RAW level
+        timestamp = get_timestamp()
+        return LogLevel.RAW, timestamp, line, f"{timestamp} {LogLevel.RAW.value}{get_spacing(LogLevel.RAW)}{line}"
+
+
+def custom_line(level: LogLevel, message: str):
+    """
+    Process a custom line that doesn't come from the server.
+    Args:
+        message (str): The message to process.
+        level (LogLevel): The log level to use for this line.
+    Returns:
+        level (LogLevel): The log level.
+        timestamp (str): The timestamp.
+        message (str): The message.
+        line (str): The complete formatted line.
+    """
+    timestamp = get_timestamp()
+    return level, timestamp, message, f"{timestamp} {level.value}{get_spacing(level)}{message}"

@@ -1,6 +1,6 @@
 from .broadcast_handler import BroadcastHandler
 from .buffered_daily_logger import BufferedDailyLogger
-from .format_helper import LogLevel, get_timestamp, get_spacing, get_prefix, process_line
+from .format_helper import LogLevel, get_timestamp, get_spacing, custom_line, process_line
 from .broadcaster import LineBroadcaster, SignalBroadcaster
 from .platform import Platform
 from .bedrock_download_link_fetcher import UpdateInfo, get_bedrock_update_info
@@ -14,7 +14,7 @@ __all__ = [
     'LogLevel',
     'get_timestamp',
     'get_spacing',
-    'get_prefix',
+    'custom_line',
     'process_line',
     'LineBroadcaster',
     'SignalBroadcaster',
