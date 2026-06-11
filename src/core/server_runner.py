@@ -1,5 +1,5 @@
 import sys
-from utils import LineBroadcaster, SignalBroadcaster, process_line, get_prefix, LogLevel, Platform, create_job_object, close_job_object
+from utils import LineBroadcaster, SignalBroadcaster, process_line, custom_line, LogLevel, Platform, create_job_object, close_job_object
 from contextlib import contextmanager
 import subprocess
 import threading
@@ -21,6 +21,7 @@ class ServerRunner:
         self.shutdown_timeout = config.shutdown_timeout
         self.platform = config.platform
         self.process = None
+        self._warned_no_log_file = False
         self.stdout_broadcaster = LineBroadcaster()
         self.unexpected_shutdown_broadcaster = LineBroadcaster()
         self._stdout_thread = None
@@ -118,26 +119,40 @@ class ServerRunner:
             # Detect and strip no log file prefix (this happens when the server is running two instances on the same port)
             if line.startswith("NO LOG FILE! - ["):
                 line = line[len("NO LOG FILE! - "):]
-                # Show a warning about this on first detection only once using getattr()
-                if not getattr(process_line, "warned_no_log_file", False):
-                    self.stdout_broadcaster.publish(get_prefix(LogLevel.WARN), "Detected 'NO LOG FILE!' prefix in server output. This usually means another server instance is running or the log file is locked. Log output will only appear in the console and not in a file. Subsequent messages will not show this warning.")
-                    process_line.warned_no_log_file = True
-            # Format then broadcast the timestamp and line
-            timestamp, message = process_line(line.rstrip())
-            self.stdout_broadcaster.publish(timestamp, message)
+                # Only warn about the no log file issue once
+                if not self._warned_no_log_file:
+                    self.stdout_broadcaster.publish(
+                        *custom_line(
+                            LogLevel.WARN,
+                            "Detected 'NO LOG FILE!' prefix in server output. This usually means another server instance is running or the log file is locked."
+                            "Log output will only appear in the console and not in a file. Subsequent messages will not show this warning."
+                        )
+                    )
+                    self._warned_no_log_file = True
+            # Process the line and publish it to stdout subscribers
+            self.stdout_broadcaster.publish(*process_line(line))
             # Detect if the line is a missing server.properties error
             if "Error opening file: server.properties" in line:
-                self.stdout_broadcaster.publish(get_prefix(LogLevel.CRITICAL), "The server failed to start due to a missing server.properties file. Please ensure that server.properties exists in the server folder and is properly configured.")
+                self.stdout_broadcaster.publish(
+                    *custom_line(
+                        LogLevel.CRITICAL,
+                        "The server failed to start due to a missing server.properties file."
+                        "Please ensure that server.properties exists in the server folder and is properly configured."
+                    )
+                )
                 self.send_command("")           # Since the server is looking for an input to continue, send an empty string to prevent it from hanging
                 self._expected_shutdown = True  # Prevent the unexpected shutdown message since we know why it happened
-        self.process.stdout.close()
         # Clean up runner state after process exits
+        self.process.stdout.close()
         self.process = None
         self._stdout_thread = None
         # If the shutdown was not expected, we alert all subscribers
         if not self._expected_shutdown:
-            self.unexpected_shutdown_broadcaster.publish(get_prefix(LogLevel.ERROR), "The server has shut down unexpectedly.")
-        # Clean up the Windows Job Object if it exists
+            self.unexpected_shutdown_broadcaster.publish(
+                *custom_line(LogLevel.ERROR, "The server has shut down unexpectedly.")
+            )
+        # Clean up the
+        # Windows Job Object if it exists
         if self._job is not None:
             close_job_object(self._job)
             self._job = None
