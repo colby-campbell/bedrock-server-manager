@@ -17,13 +17,11 @@ ONLINE_BACKUP_PREFIX = "online_world_backup"    # eg. "online_world_backup_YYYY-
 PROTECTED_BACKUP_PREFIX = "protected"           # eg. "protected_offline_world_backup_YYYY-MM-DD_HH-MM-SS"
 TEMPORARY_PREFIX = ".tmp"                       # eg. ".tmp_offline_world_backup_YYYY-MM-DD_HH-MM-SS"
 BACKUP_TIMESTAMP_FORMAT = "%Y-%m-%d_%H-%M-%S"
-DEQUE_MAX_LENGTH = 100
 SUCCESS_PATTERN = re.compile(r"Data saved. Files are now ready to be copied.", re.IGNORECASE)
 FAIL_PATTERN = re.compile(r"A previous save has not been completed.", re.IGNORECASE)
 DATE_PATTERN = re.compile(r'^\d{4}-\d{2}-\d{2}$')
 PLAYERS_ONLINE_PATTERN = re.compile(r"There are (\d+)\/(\d+) players online:")
 SAVE_QUERY_TIMEOUT_SECONDS = 10
-WORLDS_FOLDER_NAME = "worlds"
 DOWNLOAD_CONNECT_TIMEOUT_SECONDS = 10
 DOWNLOAD_READ_TIMEOUT_SECONDS = 300
 DOWNLOAD_CHUNK_SIZE = 1024 * 1024 # 1MB (in binary)
@@ -342,8 +340,8 @@ class ServerAutomation:
 
             # Temporarily subscribe to stdout to monitor for the success or failure of the save query command
             stdout_queue = queue.Queue()
-            def queue_server_output(prefix, line):
-                stdout_queue.put((prefix, line))
+            def queue_server_output(level, _ts, message, _line):
+                stdout_queue.put((level, message))
             self.runner.stdout_broadcaster.subscribe(queue_server_output)
 
             try:
@@ -357,7 +355,7 @@ class ServerAutomation:
                     # Read lines from the queue until we see the success or failure pattern, or until we hit the timeout
                     while True:
                         try:
-                            _lvl, _ts, message, _line = stdout_queue.get(timeout=max(0.01, hold_deadline - time()))
+                            _level, message = stdout_queue.get(timeout=max(0.01, hold_deadline - time()))
                             if SUCCESS_PATTERN.match(message):
                                 hold_confirmed = True
                                 break
@@ -381,7 +379,7 @@ class ServerAutomation:
                 # The file list arrives on the line immediately after the success message
                 try:
                     while True:
-                        level, _ts, message, _line = stdout_queue.get(timeout=1.0)
+                        level, message = stdout_queue.get(timeout=1.0)
                         if level == LogLevel.RAW:
                             file_list = message
                             break
@@ -407,7 +405,7 @@ class ServerAutomation:
             self.log_print(LogLevel.INFO, "Copying necessary files for online backup...")
             try:
                 # Copy each file reported by the save query
-                for file_path, bytes in files:
+                for file_path, file_size in files:
                     # Create source and destination paths for each file
                     source = world_dir / file_path.replace(f"{world_dir.name}/", "")
                     dest = temp_dir / file_path.replace(f"{world_dir.name}/", "")
@@ -415,9 +413,8 @@ class ServerAutomation:
                     dest.parent.mkdir(parents=True, exist_ok=True)
                     shutil.copy2(source, dest)
                     # Truncate the file to the requested size
-                    f = open(dest, "a")
-                    f.truncate(bytes)
-                    f.close()
+                    with open(dest, "r+b") as f:
+                        f.truncate(file_size)
                 # Rename the temporary directory to the final destination
                 temp_dir.rename(dest_dir)
                 # Resume server writes
@@ -563,7 +560,7 @@ class ServerAutomation:
             else:
                 self.log_print(LogLevel.WARN, "No backups found to unmark as protected.")
                 return "No backups found to unmark as protected."
-        elif re.match(r'^\d{4}-\d{2}-\d{2}$', identifier):
+        elif DATE_PATTERN.match(identifier):
             # Unmark all backups from the given date
             date_str = identifier
             unmarked_backups = []
