@@ -7,14 +7,18 @@ SPACING_LENGTH = 9
 PROCESS_LINE_REGEX = re.compile(r"\[(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}[:,]\d{3}) (?P<level>\w+)\](?: (?P<message>.*))?")
 
 class LogLevel(enum.Enum):
-    INFO = "INFO"
-    DEBUG = "DEBUG"
-    WARN = "WARN"
-    ERROR = "ERROR"
-    CRITICAL = "CRITICAL"
-    RAW = "RAW"
-    CLI = "CLI"
-    UNKNOWN = "UNKNOWN"
+    INFO = ("INFO", "\033[34m") # Blue
+    DEBUG = ("DEBUG", "\033[36m") # Cyan
+    WARN = ("WARN", "\033[33m") # Yellow
+    ERROR = ("ERROR", "\033[31m") # Red
+    CRITICAL = ("CRITICAL", "\033[1;31m") # Bold Red
+    RAW = ("RAW", "\033[32m") # Green
+    CLI = ("CLI", "\033[35m") # Magenta
+    UNKNOWN = ("UNKNOWN", "\033[1;33m") # Bold Yellow
+
+    def __init__(self, label, ansi_code):
+        self.label = label
+        self.ansi_code = ansi_code
 
 
 def get_timestamp():
