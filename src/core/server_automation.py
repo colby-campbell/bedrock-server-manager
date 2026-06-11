@@ -1,5 +1,5 @@
 import requests
-from utils import BufferedDailyLogger, LineBroadcaster, get_prefix, LogLevel, UpdateInfo, get_bedrock_update_info
+from utils import BufferedDailyLogger, LineBroadcaster, custom_line, LogLevel, UpdateInfo, get_bedrock_update_info
 from datetime import datetime, timedelta
 from pathlib import Path
 from time import sleep, strftime, time
@@ -52,16 +52,16 @@ class ServerAutomation:
         self.current_version = None
 
 
-    def log_print(self, level: LogLevel, line):
+    def log_print(self, level: LogLevel, message: str):
         """
         Logs and broadcasts a line with the given log level.
         Args:
             level (LogLevel): The log level of the message.
-            line (str): The message to log and broadcast.
+            message (str): The message to log and broadcast.
         """
-        prefix = get_prefix(level)
-        self.logger.log(prefix + line)
-        self.automation_output_broadcaster.publish(prefix, line)
+        lvl, ts, msg, line = custom_line(level, message)
+        self.logger.log(line)
+        self.automation_output_broadcaster.publish(lvl, ts, msg, line)
 
 
     def start(self):
@@ -73,29 +73,33 @@ class ServerAutomation:
         self._prune_old_backups(Path(self.backup_folder))
 
 
-    def handle_server_output(self, timestamp, line):
+    def handle_server_output(self, _level: LogLevel, _timestamp: str, message: str, line: str):
         """
         Process server output lines for automation triggers.
         Args:
-            timestamp (str): The timestamp of the output line.
+            _level (LogLevel): The log level of the output line (unused).
+            _timestamp (str): The timestamp of the output line (unused).
+            message (str): The message of the output line.
             line (str): The output line from the server.
         """
         # Scrape the line for the version number to use in update checks
-        if (line.startswith("Version:")):
-            self.current_version = line.split("Version:")[1].strip()
-        self.logger.log(timestamp + line)
+        if (message.startswith("Version:")):
+            self.current_version = message.split("Version:")[1].strip()
+        self.logger.log(line)
 
 
-    def handle_unexpected_shutdown(self, timestamp, line):
+    def handle_unexpected_shutdown(self, level: LogLevel, timestamp: str, message: str, line: str):
         """
         Handle unexpected server shutdowns.
         Args:
-            timestamp (str): The timestamp of the shutdown event.
-            line (str): The output line indicating the shutdown.
+            level (LogLevel): The log level of the output line.
+            timestamp (str): The timestamp of the output line.
+            message (str): The message of the output line.
+            line (str): The output line from the server.
         """
         # Log the unexpected shutdown
-        self.logger.log(timestamp + line)
-        self.automation_output_broadcaster.publish(timestamp, line)
+        self.logger.log(line)
+        self.automation_output_broadcaster.publish(level, timestamp, message, line)
         # Add the crash time to the list of crashes
         now = datetime.now()
         self.recent_crashes.append(now)
@@ -321,8 +325,8 @@ class ServerAutomation:
 
             # Temporarily subscribe to stdout to monitor for the success or failure of the save query command
             stdout_queue = queue.Queue()
-            def queue_server_output(_, line):
-                stdout_queue.put(line)
+            def queue_server_output(prefix, line):
+                stdout_queue.put((prefix, line))
             self.runner.stdout_broadcaster.subscribe(queue_server_output)
 
             try:
@@ -336,11 +340,11 @@ class ServerAutomation:
                     # Read lines from the queue until we see the success or failure pattern, or until we hit the timeout
                     while True:
                         try:
-                            line = stdout_queue.get(timeout=max(0.01, hold_deadline - time()))
-                            if re.search(SUCCESS_PATTERN, line, re.IGNORECASE):
+                            _lvl, _ts, message, _line = stdout_queue.get(timeout=max(0.01, hold_deadline - time()))
+                            if re.search(SUCCESS_PATTERN, message, re.IGNORECASE):
                                 hold_confirmed = True
                                 break
-                            elif re.search(FAIL_PATTERN, line, re.IGNORECASE):
+                            elif re.search(FAIL_PATTERN, message, re.IGNORECASE):
                                 # If we get a failure message, drain the queue and break to retry the save query command
                                 while not stdout_queue.empty():
                                     stdout_queue.get_nowait()
@@ -359,7 +363,11 @@ class ServerAutomation:
 
                 # The file list arrives on the line immediately after the success message
                 try:
-                    file_list_line = stdout_queue.get(timeout=1.0)
+                    while True:
+                        level, _ts, message, _line = stdout_queue.get(timeout=1.0)
+                        if level == LogLevel.RAW:
+                            file_list = message
+                            break
                 except queue.Empty:
                     self.log_print(LogLevel.WARN, "Timed out waiting for file list after save query.")
                     try:
@@ -372,7 +380,7 @@ class ServerAutomation:
 
             # Extract file list from the line following the success message
             files = []
-            entries = file_list_line.split(', ')
+            entries = file_list.split(', ')
             for entry in entries:
                 if ':' in entry:
                     path, size = entry.rsplit(':', 1)
