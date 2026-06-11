@@ -18,11 +18,12 @@ PROTECTED_BACKUP_PREFIX = "protected"           # eg. "protected_offline_world_b
 TEMPORARY_PREFIX = ".tmp"                       # eg. ".tmp_offline_world_backup_YYYY-MM-DD_HH-MM-SS"
 BACKUP_TIMESTAMP_FORMAT = "%Y-%m-%d_%H-%M-%S"
 DEQUE_MAX_LENGTH = 100
-SUCCESS_PATTERN = r"Data saved. Files are now ready to be copied."
-FAIL_PATTERN = r"A previous save has not been completed."
+SUCCESS_PATTERN = re.compile(r"Data saved. Files are now ready to be copied.", re.IGNORECASE)
+FAIL_PATTERN = re.compile(r"A previous save has not been completed.", re.IGNORECASE)
+DATE_PATTERN = re.compile(r'^\d{4}-\d{2}-\d{2}$')
+PLAYERS_ONLINE_PATTERN = re.compile(r"There are (\d+)\/(\d+) players online:")
 SAVE_QUERY_TIMEOUT_SECONDS = 10
 WORLDS_FOLDER_NAME = "worlds"
-VERSION_REGEX = r"bedrock-server-([0-9.]+)\.zip"
 DOWNLOAD_CONNECT_TIMEOUT_SECONDS = 10
 DOWNLOAD_READ_TIMEOUT_SECONDS = 300
 DOWNLOAD_CHUNK_SIZE = 1024 * 1024 # 1MB (in binary)
@@ -165,31 +166,47 @@ class ServerAutomation:
     
     def get_online_players(self):
         """Get the list of online players from the server."""
-        with self.runner.lock():
-            if self.runner.is_running():
+        if not self.runner.is_running():
+            return "No online players (server is offline)."
+
+        stdout_queue = queue.Queue()
+        def queue_server_output(level, _ts, message, _line):
+            stdout_queue.put((level, message))
+        self.runner.stdout_broadcaster.subscribe(queue_server_output)
+
+        try:
+            try:
+                self.runner.send_command("list")
+            except RuntimeError:
+                self.log_print(LogLevel.ERROR, "Failed to send 'list' command: server is not running.")
+                return "No online players (server is offline)."
+
+            players = []
+            player_count = 0
+            max_players = 0
+            while True:
                 try:
-                    self.runner.send_command("list")
-                except RuntimeError:
-                    self.log_print(LogLevel.ERROR, "Failed to send 'list' command: server is not running.")
-                    return "No online players (server is offline)."
-                # Wait briefly for output to be processed to the deque buffer
-                sleep(0.25)
-                # Look for the line that starts with "There are X/Y players online:" and extract the player list from the preceding lines
-                for index, line in enumerate(self._recent_lines):
-                    match = re.search(r"There are (\d+)\/(\d+) players online:", line)
+                    level, message = stdout_queue.get(timeout=5.0)
+                except queue.Empty:
+                    self.log_print(LogLevel.WARN, "Timed out waiting for response to 'list' command.")
+                    return "Failed to get online players: no response from server."
+                # Look for the "There are X/Y players online" header
+                if player_count == 0:
+                    match = PLAYERS_ONLINE_PATTERN.search(message)
                     if match:
                         player_count = int(match.group(1))
                         max_players = int(match.group(2))
                         if player_count == 0:
                             return f"There are 0/{max_players} players online."
-                        else:
-                            # Player names follow the header in server output, so they sit at lower indices (newer) in the newest-first deque
-                            players = []
-                            for i in range(index - player_count, index):
-                                players.append(self._recent_lines[i].strip())
-                            return f"There are {player_count}/{max_players} players online: {', '.join(players)}"
-            else:
-                return "No online players (server is offline)."
+                # Player names follow the header, one per RAW line
+                elif level == LogLevel.RAW:
+                    players.append(message.strip())
+                    if len(players) >= player_count:
+                        break
+        finally:
+            self.runner.stdout_broadcaster.unsubscribe(queue_server_output)
+
+        return f"There are {player_count}/{max_players} players online: {', '.join(players)}"
 
 
     def _prune_old_backups(self, backup_root: Path):
@@ -341,10 +358,10 @@ class ServerAutomation:
                     while True:
                         try:
                             _lvl, _ts, message, _line = stdout_queue.get(timeout=max(0.01, hold_deadline - time()))
-                            if re.search(SUCCESS_PATTERN, message, re.IGNORECASE):
+                            if SUCCESS_PATTERN.match(message):
                                 hold_confirmed = True
                                 break
-                            elif re.search(FAIL_PATTERN, message, re.IGNORECASE):
+                            elif FAIL_PATTERN.match(message):
                                 # If we get a failure message, drain the queue and break to retry the save query command
                                 while not stdout_queue.empty():
                                     stdout_queue.get_nowait()
@@ -491,7 +508,7 @@ class ServerAutomation:
             else:
                 self.log_print(LogLevel.WARN, "No backups found to mark as protected.")
                 return "No backups found to mark as protected."
-        elif re.match(r'^\d{4}-\d{2}-\d{2}$', identifier):
+        elif DATE_PATTERN.match(identifier):
             # Mark all backups from the given date
             date_str = identifier
             marked_backups = []
