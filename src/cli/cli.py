@@ -1,7 +1,6 @@
 from prompt_toolkit import prompt, print_formatted_text, ANSI, PromptSession
 from prompt_toolkit.patch_stdout import patch_stdout
-from utils import get_timestamp
-import re
+from utils import get_spacing, custom_line, LogLevel
 
 # Constants
 BLOCKED_COMMANDS = {
@@ -14,37 +13,9 @@ BLOCKED_COMMANDS = {
     }
 
 
-def add_colour(prefix, message):
-    """Process a line from the server."""
-    # Regex to parse log lines
-    pattern = re.compile(r"(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}[:,]\d{3}) (?P<level>\w+)")
-    match = pattern.match(prefix)
-    if match:
-        timestamp = match.group("timestamp")
-        level = match.group("level")
-        # ANSI color codes based on log level
-        match level:
-            case "INFO":
-                ansi_code = "\033[34m"  # Blue for info
-            case "DEBUG":
-                ansi_code = "\033[36m"  # Cyan for debug
-            case "WARN":
-                ansi_code = "\033[33m"  # Yellow for warning
-            case "ERROR":
-                ansi_code = "\033[31m"  # Red for error
-            case "CRITICAL":
-                ansi_code = "\033[1;31m"  # Bold red for critical
-            case "RAW":
-                ansi_code = "\033[32m"  # Green for raw
-            case _:
-                ansi_code = "\033[33m"  # Default to yellow for unrecognized levels
-        # Calculate spacing for alignment
-        spacing = " " * (max(9 - len(level), 1))
-        # Return the formatted line with ANSI codes
-        return f"\033[1;90m{timestamp} {ansi_code}{level}\033[0m{spacing}{message}"
-    else:
-        # If the line's timestamp fails the regular expression, return it with an error
-        return f"Failed to format line: {prefix}{message}"
+def add_colour(level, timestamp, message):
+    """Add ANSI colour codes to a line based on the log level."""
+    return f"\033[1;90m{timestamp} {level.ansi_code}{level.label}\033[0m{get_spacing(level)}{message}"
 
 
 class CommandLineInterface:
@@ -67,7 +38,7 @@ class CommandLineInterface:
         # Subscribe to the stdout broadcaster and unexpected shutdown broadcaster
         self.runner.stdout_broadcaster.subscribe(self.handle_server_output)
         self.automation = automation
-        self.automation.automation_output_broadcaster.subscribe(self.handle_automation_ouput)
+        self.automation.automation_output_broadcaster.subscribe(self.handle_automation_output)
         self.bot = bot
         # Subscribe to the discord bot broadcaster if bot is provided
         if self.bot is not None:
@@ -77,34 +48,35 @@ class CommandLineInterface:
         self.running = True
 
 
-    def handle_server_output(self, timestamp, line):
+    def handle_server_output(self, level, timestamp, message, _line):
         """Handle server output lines by printing them to the CLI."""
         if self.running:
-            print_formatted_text(ANSI(add_colour(timestamp, line)))
+            print_formatted_text(ANSI(add_colour(level, timestamp, message)))
 
 
-    def handle_automation_ouput(self, timestamp, line):
+    def handle_automation_output(self, level, timestamp, message, _line):
         """Handle automation output by printing it to the CLI."""
         if self.running:
-            print_formatted_text(ANSI(add_colour(timestamp, line)))
+            print_formatted_text(ANSI(add_colour(level, timestamp, message)))
 
 
-    def handle_discord_output(self, timestamp, line):
+    def handle_discord_output(self, level, timestamp, message, _line):
         """Handle discord output log messages by printing them to the CLI."""
         if self.running:
-            print_formatted_text(ANSI(add_colour(timestamp, line)))
+            print_formatted_text(ANSI(add_colour(level, timestamp, message)))
 
 
-    def log_print(self, line):
+    def log_print(self, message):
         """Prints to the screen with colour codes, and prints to the log without colour codes"""
-        timestamp = get_timestamp()
-        print_formatted_text(ANSI(f"\033[1;90m{timestamp} \033[35mCLI\033[0m      {line}"))
-        self.automation.logger.log(f"{timestamp} CLI      {line}")
+        lvl, ts, msg, line = custom_line(LogLevel.CLI, message)
+        print_formatted_text(ANSI(add_colour(lvl, ts, msg)))
+        self.automation.logger.log(line)
     
 
-    def just_print(self, line):
+    def just_print(self, message):
         """Just prints to the screen with colour codes"""
-        print_formatted_text(ANSI(f"\033[1;90m{get_timestamp()} \033[35mCLI\033[0m      {line}"))
+        lvl, ts, msg, _line = custom_line(LogLevel.CLI, message)
+        print_formatted_text(ANSI(add_colour(lvl, ts, msg)))
 
 
     def start(self):
@@ -122,7 +94,7 @@ class CommandLineInterface:
                     input_text = session.prompt('bedrock-server> ').strip()
             except EOFError:
                 # If the bot is not running or is fully started or fully stopped, allow exit
-                if self.bot is None or self.bot is not None and self.bot.bot.is_ready() or self.bot is not None and self.bot.bot.is_closed():
+                if self.bot is None or self.bot.bot.is_ready() or self.bot.bot.is_closed():
                     self.log_print("EOF received, forcefully exiting CLI...")
                     self.running = False
                     break
@@ -137,7 +109,10 @@ class CommandLineInterface:
             # Built-in CLI commands
             if input_text.startswith(':'):
                 # Process CLI built-in command
-                cmd = input_text[1:].lower().strip()
+                parts = input_text[1:].strip().split(maxsplit=1)
+                cmd = parts[0].lower()
+                arg = parts[1] if len(parts) > 1 else ""
+
                 # Help
                 if cmd == 'help':
                     help_text = """
@@ -198,30 +173,24 @@ class CommandLineInterface:
                     result = self.automation.list_backups()
                     self.just_print(result)
                 # Mark
-                elif cmd.startswith('mark'):
-                    args = cmd.split(maxsplit=1)
-                    if len(args) == 2:
-                        backup_identifier = args[1].strip()
-                        self.automation.mark_backup(backup_identifier)
+                elif cmd == 'mark':
+                    if arg:
+                        self.automation.mark_backup(arg)
                     else:
                         self.just_print("Usage: :mark <backup_name | latest | YYYY-MM-DD>")
                 # Unmark
-                elif cmd.startswith('unmark'):
-                    args = cmd.split(maxsplit=1)
-                    if len(args) == 2:
-                        backup_identifier = args[1].strip()
-                        self.automation.unmark_backup(backup_identifier)
+                elif cmd == 'unmark':
+                    if arg:
+                        self.automation.unmark_backup(arg)
                     else:
                         self.just_print("Usage: :unmark <backup_name | latest | YYYY-MM-DD>")
                 # Switch to backup
-                elif cmd.startswith('switch'):
+                elif cmd == 'switch':
                     if self.runner.is_running():
                         self.just_print("Cannot switch world while server is running, please stop the server first.")
                         continue
-                    args = cmd.split(maxsplit=1)
-                    if len(args) == 2:
-                        backup_name = args[1].strip()
-                        self.automation.switch_to_backup_world(backup_name)
+                    if arg:
+                        self.automation.switch_to_backup_world(arg)
                     else:
                         self.just_print("Usage: :switch <backup_name>")
                 # Check for updates
@@ -239,7 +208,7 @@ class CommandLineInterface:
                 # Exit
                 elif cmd == 'exit' or cmd == 'quit':
                     # If the bot is not running or is fully started or fully stopped, allow exit
-                    if self.bot is None or self.bot is not None and self.bot.bot.is_ready() or self.bot is not None and self.bot.bot.is_closed():
+                    if self.bot is None or self.bot.bot.is_ready() or self.bot.bot.is_closed():
                         if self.runner.is_running():
                             self.log_print("Stopping server before exit...")
                             self.runner.stop()
