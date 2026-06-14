@@ -39,7 +39,6 @@ def download_and_extract_bedrock(platform, server_folder):
                 with open(download_path, "wb") as f:
                     total = int(resp.headers.get('Content-Length', 0))
                     downloaded = 0
-                    show_bar = sys.stdout.isatty()
                     last_percent = -1
                     last_logged = 0
                     for chunk in resp.iter_content(chunk_size=DOWNLOAD_CHUNK_SIZE):
