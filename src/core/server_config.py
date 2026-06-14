@@ -301,7 +301,7 @@ class ServerConfig:
                     if not isinstance(value, str):
                         errors.append(f"{name}: must be a string representing a folder path")
                     elif not os.path.exists(value):
-                        os.mkdir(value)
+                        os.makedirs(value, exist_ok=True)
                 case self.SettingType.TIME:
                     if not isinstance(value, str):
                         errors.append(f"{name}: must be a string in HH:MM format")
