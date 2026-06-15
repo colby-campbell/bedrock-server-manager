@@ -43,11 +43,12 @@ class DiscordBot:
         self.admin_list = config.admins
         self.token = config.bot_token
         self.custom_commands = config.custom_commands
+        self.discord_debug = config.discord_debug
         self.runner = runner
         self.automation = automation
         self.broadcaster = LineBroadcaster()
         # Create a custom broadcast handler for logging
-        self.broadcast_handler = BroadcastHandler(self.broadcaster, self.automation.logger, self.config.discord_debug)
+        self.broadcast_handler = BroadcastHandler(self.broadcaster, self.automation.logger)
         # Create a custom log formatter for logging
         self.log_formatter = logging.Formatter('[%(asctime)s %(levelname)s] %(message)s')
         intents = discord.Intents.default()
@@ -103,7 +104,7 @@ class DiscordBot:
         async def discord_cmd(ctx):
             queue = asyncio.Queue()
 
-            def on_server_output(_timestamp, line):
+            def on_server_output(_level, _timestamp, _message, line):
                 queue.put_nowait(line)
 
             self.automation.log_print(LogLevel.INFO, f"cmd mode started by {ctx.author}.")
@@ -278,7 +279,7 @@ class DiscordBot:
                 self.token,
                 log_handler=self.broadcast_handler,
                 log_formatter=self.log_formatter,
-                log_level=logging.DEBUG if self.config.discord_debug else logging.INFO
+                log_level=logging.DEBUG if self.discord_debug else logging.INFO
             )
         except Exception as e:
             self.automation.log_print(LogLevel.ERROR, f"Error starting Discord bot: {e}")
