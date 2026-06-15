@@ -1,26 +1,168 @@
-from prompt_toolkit import prompt, print_formatted_text, ANSI, PromptSession
+from prompt_toolkit import print_formatted_text, ANSI, PromptSession
 from prompt_toolkit.patch_stdout import patch_stdout
 from prompt_toolkit.history import FileHistory
-from prompt_toolkit.completion import WordCompleter
+from prompt_toolkit.completion import Completer, Completion
+from prompt_toolkit.auto_suggest import AutoSuggest, Suggestion
 from utils import get_spacing, custom_line, LogLevel
 import os
+import json
 
-# Built-in CLI commands for autocomplete
-CLI_COMMANDS = [
+# Blocked commands that should not be sent to the server if typed without the prefix, and instead should prompt the user to use the built-in CLI command with the prefix
+BLOCKED_COMMANDS = {
+    'stop': 'stop',
+    'start': 'start',
+    'restart': 'restart',
+    'exit': 'exit',
+    'quit': 'quit',
+    'save': 'backup'
+}
+
+_CLI_COMMANDS = [
     ':help', ':online', ':start', ':stop', ':restart',
     ':backup', ':list', ':mark', ':unmark', ':switch',
     ':check', ':update', ':exit', ':quit',
 ]
 
-# Constants
-BLOCKED_COMMANDS = {
-        'stop': 'stop',
-        'start': 'start',
-        'restart': 'restart',
-        'exit': 'exit',
-        'quit': 'quit',
-        'save': 'backup'
-    }
+
+def _load_commands():
+    """Load bedrock_commands.json and return (commands dict, categories dict)."""
+    commands_file = os.path.join(os.path.dirname(__file__), "bedrock_commands.json")
+    try:
+        with open(commands_file, encoding="utf-8") as f:
+            data = json.load(f)
+        return data.get("commands", {}), data.get("categories", {})
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}, {}
+
+
+def _tokenize(text):
+    """Return (tokens, trailing_space) for the given input text."""
+    tokens = text.split()
+    trailing_space = bool(text) and text[-1] == ' '
+    return tokens, trailing_space
+
+
+def _navigate(commands, tokens, trailing_space):
+    """
+    Navigate the command tree given the current token list and whether the
+    input ends with a space.  Returns (node, arg_index, current_word):
+      - node       — the deepest matching command node
+      - arg_index  — positional index within node.completions for the next completion
+      - current_word — the partial token being typed ('' when trailing_space is True)
+    Returns (None, 0, '') when the root command is not recognised.
+    """
+    if not tokens or tokens[0] not in commands:
+        return None, 0, ''
+
+    node = commands[tokens[0]]
+    args = tokens[1:]
+
+    if trailing_space:
+        args_to_process, current_word = args, ''
+    else:
+        args_to_process, current_word = args[:-1], (args[-1] if args else '')
+
+    arg_index = 0
+    for token in args_to_process:
+        children = node.get('children', {})
+        if children and token in children:
+            node = children[token]
+            arg_index = 0
+        else:
+            arg_index += 1
+
+    return node, arg_index, current_word
+
+
+class BedrockCompleter(Completer):
+    def __init__(self, commands, get_players):
+        self._commands = commands
+        self._get_players = get_players
+
+    def get_completions(self, document, _complete_event):
+        text = document.text_before_cursor
+        tokens, trailing_space = _tokenize(text)
+
+        # CLI built-in commands (start with ':')
+        if text.startswith(':'):
+            word = tokens[0] if tokens else ':'
+            for cmd in _CLI_COMMANDS:
+                if cmd.startswith(word):
+                    yield Completion(cmd, start_position=-len(word))
+            return
+
+        # Complete the command name itself
+        if not trailing_space and len(tokens) <= 1:
+            word = tokens[0] if tokens else ''
+            for cmd in self._commands:
+                if cmd.startswith(word):
+                    yield Completion(cmd, start_position=-len(word))
+            return
+
+        node, arg_index, current_word = _navigate(self._commands, tokens, trailing_space)
+        if node is None:
+            return
+
+        # Offer child subcommand names first
+        children = node.get('children', {})
+        if children and arg_index == 0:
+            for name in children:
+                if name.startswith(current_word):
+                    yield Completion(name, start_position=-len(current_word))
+            return
+
+        # Offer typed completions (enum values or online player names)
+        comp_list = node.get('completions', [])
+        if arg_index < len(comp_list):
+            comp = comp_list[arg_index]
+            if comp['type'] == 'players':
+                for player in self._get_players():
+                    if player.lower().startswith(current_word.lower()):
+                        yield Completion(player, start_position=-len(current_word))
+            elif comp['type'] == 'enum':
+                for value in comp['values']:
+                    if value.startswith(current_word):
+                        yield Completion(value, start_position=-len(current_word))
+
+
+class BedrockAutoSuggest(AutoSuggest):
+    def __init__(self, commands):
+        self._commands = commands
+
+    def get_suggestion(self, _buffer, document):
+        text = document.text_before_cursor
+        if not text.strip() or text.startswith(':'):
+            return None
+
+        tokens, trailing_space = _tokenize(text)
+        if not tokens or tokens[0] not in self._commands:
+            return None
+
+        node, arg_index, current_word = _navigate(self._commands, tokens, trailing_space)
+        if node is None:
+            return None
+
+        args_syntax = node.get('args', [])
+        if not args_syntax:
+            return None
+
+        # When mid-word on a children node let the dropdown handle it; no ghost text needed
+        is_children_node = bool(node.get('children')) and arg_index == 0
+        mid_word = bool(current_word) and not trailing_space
+
+        if mid_word and not is_children_node:
+            # Show args after the one currently being typed
+            remaining = args_syntax[arg_index + 1:]
+            if not remaining:
+                return None
+            return Suggestion(' ' + ' '.join(remaining))
+        else:
+            remaining = args_syntax[arg_index:]
+            if not remaining:
+                return None
+            # Add a leading space when the user hasn't yet typed a space after the command
+            prefix = ' ' if not trailing_space else ''
+            return Suggestion(prefix + ' '.join(remaining))
 
 
 def add_colour(level, timestamp, message):
@@ -92,9 +234,11 @@ class CommandLineInterface:
     def start(self):
         """Start the command-line interface loop."""
         history_path = os.path.join(self.config.log_folder, "cli_history")
+        commands, _ = _load_commands()
         session = PromptSession(
             history=FileHistory(history_path),
-            completer=WordCompleter(CLI_COMMANDS, sentence=True),
+            completer=BedrockCompleter(commands, lambda: self.automation.online_players),
+            auto_suggest=BedrockAutoSuggest(commands),
         )
         # Starting print messages for CLI
 
