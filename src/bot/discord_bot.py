@@ -184,14 +184,14 @@ class DiscordBot:
         async def discord_backup(ctx):
             self.automation.log_print(LogLevel.INFO, f"!backup invoked by {ctx.author}.")
             await ctx.send("Starting world backup...")
-            await asyncio.get_event_loop().run_in_executor(None, self.automation.smart_backup)
-            await ctx.send("World backup completed.")
-            
+            result = await asyncio.get_event_loop().run_in_executor(None, self.automation.smart_backup)
+            await ctx.send(result)
+
         @is_admin(self.admin_list)
         @self.bot.command(name="list")
         async def discord_list(ctx):
             self.automation.log_print(LogLevel.INFO, f"!list invoked by {ctx.author}.")
-            result = self.automation.list_backups()
+            result = await asyncio.get_event_loop().run_in_executor(None, self.automation.list_backups)
             await ctx.send(result)
 
         @is_admin(self.admin_list)

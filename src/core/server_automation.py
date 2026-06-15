@@ -461,9 +461,10 @@ class ServerAutomation:
         """Perform a backup of the world, choosing online or offline based on server state."""
         with self.runner.lock():
             if self.runner.is_running():
-                self._backup_world_online()
+                result = self._backup_world_online()
             else:
-                self._backup_world_offline()
+                result = self._backup_world_offline()
+            return f"Backup completed: {result.name}" if result else "Backup failed."
 
 
     def list_backups(self):

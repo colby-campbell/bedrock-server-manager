@@ -167,7 +167,8 @@ class CommandLineInterface:
                 # Backup
                 elif cmd == 'backup':
                     self.log_print("Starting world backup...")
-                    self.automation.smart_backup()
+                    result = self.automation.smart_backup()
+                    self.log_print(result)
                 # List
                 elif cmd == 'list':
                     result = self.automation.list_backups()
