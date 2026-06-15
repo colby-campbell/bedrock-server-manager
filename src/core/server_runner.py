@@ -145,7 +145,6 @@ class ServerRunner:
         # Clean up runner state after process exits
         self.process.stdout.close()
         self.process = None
-        self._stdout_thread = None
         # If the shutdown was not expected, we alert all subscribers
         if not self._expected_shutdown:
             self.unexpected_shutdown_broadcaster.publish(
