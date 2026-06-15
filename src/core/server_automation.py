@@ -45,7 +45,9 @@ class ServerAutomation:
         # Create a broadcaster to broadcast outputs to the CLI
         self.automation_output_broadcaster = LineBroadcaster()
         # Create logger
-        self.logger = BufferedDailyLogger(self.config.log_folder)
+        self.logger = BufferedDailyLogger(
+            self.config.log_folder,
+            on_error=lambda msg: self.automation_output_broadcaster.publish(custom_line(LogLevel.ERROR, f"Error writing to log file: {msg}"))
         # Create a list of crashes
         self.recent_crashes = []
         self.current_version = None

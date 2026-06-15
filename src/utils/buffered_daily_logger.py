@@ -12,13 +12,15 @@ FLUSH_INTERVAL = 10
 
 class BufferedDailyLogger:
     """A custom logger class for use in the server manager"""
-    def __init__(self, log_dir):
+    def __init__(self, log_dir, on_error=None):
         """
         Buffered logger that changes the log file daily
         Args:
             log_dir (str): The path to the log directory
+            on_error (callable, optional): A function to call when an error occurs during logging. It should accept a single argument, which is the error message. Defaults to None.
         """
         self.log_dir = log_dir
+        self.on_error = on_error
         self.buffer = []
         # Mutex
         self.lock = threading.Lock()
@@ -64,7 +66,13 @@ class BufferedDailyLogger:
             # Clear the buffer
             self.buffer.clear()
         except Exception as e:
-            raise Exception(e)
+            # Call the error callback if it exists
+            if self.on_error:
+                self.on_error(str(e))
+            # This is a last resort, drop logs to prevent the buffer from growing indefinitely
+            if len(self.buffer) > BUFFER_SIZE * 10:
+                self.buffer.clear()
+
         
     def _periodic_flush(self):
         """Function that runs on a separate thread to periodically flush the """
