@@ -61,7 +61,7 @@ class BufferedDailyLogger:
             self.log_file_path = self._get_log_file_path(today)
         try:
             # Append the entire buffer to the file
-            with open(self.log_file_path, "a") as f:
+            with open(self.log_file_path, "a", encoding="utf-8") as f:
                 f.write("\n".join(self.buffer) + "\n")
             # Clear the buffer
             self.buffer.clear()
