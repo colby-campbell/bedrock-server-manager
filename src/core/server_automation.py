@@ -21,6 +21,9 @@ SUCCESS_PATTERN = re.compile(r"Data saved. Files are now ready to be copied.", r
 FAIL_PATTERN = re.compile(r"A previous save has not been completed.", re.IGNORECASE)
 DATE_PATTERN = re.compile(r'^\d{4}-\d{2}-\d{2}$')
 PLAYERS_ONLINE_PATTERN = re.compile(r"There are (\d+)\/(\d+) players online:")
+VERSION_PATTERN     = re.compile(r"Version: (?P<version>[\d.]+)")
+PLAYER_CONNECT_PATTERN    = re.compile(r"Player connected: (?P<player>[^,]+),")
+PLAYER_DISCONNECT_PATTERN = re.compile(r"Player disconnected: (?P<player>[^,]+),")
 SAVE_QUERY_TIMEOUT_SECONDS = 10
 DOWNLOAD_CONNECT_TIMEOUT_SECONDS = 10
 DOWNLOAD_READ_TIMEOUT_SECONDS = 300
@@ -52,6 +55,7 @@ class ServerAutomation:
         # Create a list of crashes
         self.recent_crashes = []
         self.current_version = None
+        self.online_players = []
 
 
     def log_print(self, level: LogLevel, message: str):
@@ -88,8 +92,23 @@ class ServerAutomation:
             line (str): The output line from the server.
         """
         # Scrape the line for the version number to use in update checks
-        if (message.startswith("Version:")):
-            self.current_version = message.split("Version:")[1].strip()
+        if message.startswith("Version:"):
+            match = VERSION_PATTERN.match(message)
+            if match:
+                self.current_version = match.group("version")
+        # Scrape the line for the player connected message to update the online players list
+        elif message.startswith("Player connected:"):
+            match = PLAYER_CONNECT_PATTERN.match(message)
+            if match:
+                player = match.group("player")
+                self.online_players.append(player)
+        # Scrape the line for the player disconnected message to update the online players list
+        elif message.startswith("Player disconnected:"):
+            match = PLAYER_DISCONNECT_PATTERN.match(message)
+            if match:
+                player = match.group("player")
+                if player in self.online_players:
+                    self.online_players.remove(player)
         self.logger.log(line)
 
 
@@ -201,6 +220,7 @@ class ServerAutomation:
                         player_count = int(match.group(1))
                         max_players = int(match.group(2))
                         if player_count == 0:
+                            self.online_players.clear() # Clear the player list if there are no players online
                             return f"There are 0/{max_players} players online."
                 # Player names follow the header, one per RAW line
                 elif level == LogLevel.RAW:
@@ -210,6 +230,7 @@ class ServerAutomation:
         finally:
             self.runner.stdout_broadcaster.unsubscribe(queue_server_output)
 
+        self.online_players = players   # Update the online players list
         return f"There are {player_count}/{max_players} players online: {', '.join(players)}"
 
 
