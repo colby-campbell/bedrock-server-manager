@@ -66,7 +66,7 @@ def process_line(line: str):
         # Replace comma with colon in timestamp for consistency
         timestamp = timestamp.replace(",", ":")
         level = match.group("level")
-        spacing = " " * (max(SPACING_LENGTH - len(level), 1))
+        spacing = get_spacing(level)
         message = match.group("message") or ""
         try:
             level_enum = LogLevel[match.group("level")]

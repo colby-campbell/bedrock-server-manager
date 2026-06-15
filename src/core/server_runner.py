@@ -93,6 +93,7 @@ class ServerRunner:
 
             # On Windows, bind bedrock_server to a Job Object so it is killed when this process exits
             if self.platform == Platform.Windows:
+                # AssignProcessToJobObject requires a Win32 handle, not a PID: _handle is the internal handle Popen holds on Windows
                 self._job = create_job_object(int(self.process._handle))
 
             # Start a thread to read stdout

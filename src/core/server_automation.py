@@ -367,9 +367,12 @@ class ServerAutomation:
                                 break
                             elif FAIL_PATTERN.match(message):
                                 # If we get a failure message, drain the queue and break to retry the save query command
-                                while not stdout_queue.empty():
-                                    stdout_queue.get_nowait()
-                                break
+                                try:
+                                    while not stdout_queue.empty():
+                                        stdout_queue.get_nowait()
+                                    break
+                                except queue.Empty:
+                                    break
                         except queue.Empty:
                             break
 
@@ -874,7 +877,7 @@ class ServerAutomation:
                                     percent = downloaded * 100 // total
                                     # Log progress every 25% or on completion
                                     if percent // 25 > last_logged // 25:
-                                        self.log_print(LogLevel.INFO, f"Downloading update zip: {percent}% ({downloaded // DOWNLOAD_CHUNK_SIZE}MB / {total // DOWNLOAD_CHUNK_SIZE}MB)")
+                                        self.log_print(LogLevel.INFO, f"Downloading update zip: {percent}% ({downloaded // (1024 * 1024)}MB / {total // (1024 * 1024)}MB)")
                                         last_logged = percent
             except Exception as e:
                 # Clean temp if created

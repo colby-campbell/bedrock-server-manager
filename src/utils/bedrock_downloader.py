@@ -78,7 +78,7 @@ def download_and_extract_bedrock(platform, server_folder):
         try:
             server_dir = Path(server_folder)
             with zipfile.ZipFile(download_path, 'r') as zf:
-                files = zf.infolist()
+                files = [x for x in zf.infolist() if not x.is_dir()] 
                 last_percent = -1
                 last_logged = 0
                 for i, file in enumerate(files):
