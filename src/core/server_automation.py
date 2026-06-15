@@ -47,7 +47,7 @@ class ServerAutomation:
         # Create logger
         self.logger = BufferedDailyLogger(
             self.config.log_folder,
-            on_error=lambda msg: self.automation_output_broadcaster.publish(custom_line(LogLevel.ERROR, f"Error writing to log file: {msg}"))
+            on_error=lambda msg: self.automation_output_broadcaster.publish(*custom_line(LogLevel.ERROR, f"Error writing to log file: {msg}"))
         )
         # Create a list of crashes
         self.recent_crashes = []
@@ -219,7 +219,7 @@ class ServerAutomation:
         Args:
             backup_root (Path): The root directory where backups are stored.
         """
-        self.log_print(LogLevel.INFO, "Pruning old backups...")
+        self.log_print(LogLevel.DEBUG, "Pruning old backups...")
         cutoff_time = datetime.now() - timedelta(days=self.backup_duration)
         pruned = []
         for backup in backup_root.iterdir():
@@ -247,7 +247,7 @@ class ServerAutomation:
         if pruned:
             self.log_print(LogLevel.INFO, f"Pruned old backups: {', '.join(pruned)}")
         else:
-            self.log_print(LogLevel.INFO, "No old backups to prune.")
+            self.log_print(LogLevel.DEBUG, "No old backups to prune.")
 
 
     def _backup_world_offline(self, skip_pruning: bool = False):
@@ -272,7 +272,7 @@ class ServerAutomation:
             dest_dir = backup_root / f"{OFFLINE_BACKUP_PREFIX}_{timestamp}"
             temp_dir = backup_root / f"{TEMPORARY_PREFIX}_{OFFLINE_BACKUP_PREFIX}_{timestamp}"
 
-            self.log_print(LogLevel.INFO, f"Initiating offline backup to '{dest_dir.name}'")
+            self.log_print(LogLevel.DEBUG, f"Initiating offline backup to '{dest_dir.name}'")
 
             # Copy the world directory to a temporary location first so incomplete backups are not stored
             try:
@@ -408,7 +408,7 @@ class ServerAutomation:
                     files.append((path, int(size)))
 
             # Step 3: copy the necessary files to a temporary location
-            self.log_print(LogLevel.INFO, "Copying necessary files for online backup...")
+            self.log_print(LogLevel.DEBUG, "Copying necessary files for online backup...")
             try:
                 # Copy each file reported by the save query
                 for file_path, file_size in files:
@@ -619,11 +619,11 @@ class ServerAutomation:
                 return f"Backup '{backup_name}' does not exist."
 
             # Make an offline backup of the current world before switching and skip pruning to avoid deleting this backup (edge case)
-            self.log_print(LogLevel.INFO, "Creating offline backup of current world before switching...")
+            self.log_print(LogLevel.DEBUG, "Creating offline backup of current world before switching...")
             self._backup_world_offline(skip_pruning=True)
 
             # Remove the current world directory
-            self.log_print(LogLevel.INFO, f"Removing current world directory '{world_dir.name}'...")
+            self.log_print(LogLevel.DEBUG, f"Removing current world directory '{world_dir.name}'...")
             try:
                 shutil.rmtree(world_dir)
             except Exception as e:
@@ -631,7 +631,7 @@ class ServerAutomation:
                 return f"Failed to remove current world directory: {e}"
 
             # Restore the backup to the world directory
-            self.log_print(LogLevel.INFO, f"Restoring backup '{backup_name}' to world directory '{world_dir.name}'...")
+            self.log_print(LogLevel.DEBUG, f"Restoring backup '{backup_name}' to world directory '{world_dir.name}'...")
             try:
                 if backup_path.suffix == '.zip':
                     # Extract the zip archive if the backup is compressed
@@ -693,7 +693,7 @@ class ServerAutomation:
             dest_dir = backup_root / f"{SERVER_BACKUP_PREFIX}_{timestamp}"
             temp_dir = backup_root / f"{TEMPORARY_PREFIX}_{SERVER_BACKUP_PREFIX}_{timestamp}"
             
-            self.log_print(LogLevel.INFO, f"Backing up server files to '{dest_dir.name}'")
+            self.log_print(LogLevel.DEBUG, f"Backing up server files to '{dest_dir.name}'")
 
             # Copy the server files to a temporary location first so incomplete backups are not stored
             try:
@@ -760,7 +760,7 @@ class ServerAutomation:
         Args:
             download_path (Path): The path to the downloaded update zip file.
         """
-        self.log_print(LogLevel.INFO, "Extracting update files to server folder...")
+        self.log_print(LogLevel.DEBUG, "Extracting update files to server folder...")
         server_dir = Path(self.server_folder)
         try:
             with zipfile.ZipFile(download_path, 'r') as zf:
@@ -778,7 +778,7 @@ class ServerAutomation:
                         for p in self.config.update_protected_paths
                     )
                     if is_protected:
-                        self.log_print(LogLevel.INFO, f"Skipping protected file: {relative_path}")
+                        self.log_print(LogLevel.DEBUG, f"Skipping protected file: {relative_path}")
                         continue
 
                     dest = server_dir / relative_path
@@ -797,7 +797,7 @@ class ServerAutomation:
             self.log_print(LogLevel.CRITICAL, f"Failed to extract update files, server may be in a non-functional state: {e}")
             return False
 
-        self.log_print(LogLevel.INFO, "Update files extracted successfully.")
+        self.log_print(LogLevel.DEBUG, "Update files extracted successfully.")
         return True
 
 
@@ -881,13 +881,13 @@ class ServerAutomation:
                 shutil.rmtree(temp_dir, ignore_errors=True)
                 self.log_print(LogLevel.ERROR, f"Failed to download update: {e}")
                 return "Failed to download update."
-            self.log_print(LogLevel.INFO, "Download completed.")
+            self.log_print(LogLevel.DEBUG, "Download completed.")
 
             # Extract the downloaded files to the server folder (overwrite existing files)
             success = self._extract_update_files(download_path)
 
             # Clean up the downloaded zip file and temporary directory
-            self.log_print(LogLevel.INFO, "Cleaning up temporary files...")
+            self.log_print(LogLevel.DEBUG, "Cleaning up temporary files...")
             shutil.rmtree(temp_dir, ignore_errors=True)
 
             # If the extraction failed, return an error message (log message is handled in the extraction method)
