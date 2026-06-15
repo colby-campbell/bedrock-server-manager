@@ -69,6 +69,8 @@ bedrock-server:
 | `update_backup_paths` | list of strings \| `"all"` | Server files/folders to back up before an update. Use `"all"` to back up the entire server folder. Worlds are always backed up separately. |
 | `platform` | string | `"Windows"` or `"Linux"`. Auto-detected if not set. |
 | `world_name` | string | World name. Auto-detected from `server.properties` if not set. |
+| `automation_debug` | boolean | Whether to show DEBUG-level automation messages in the CLI and log. |
+| `discord_debug` | boolean | Whether to enable verbose discord.py internal logging. |
 | `[[custom_commands]]` | array of tables | Optional custom Discord bot commands. Must be placed at the end of the file. See [Custom Discord Commands](#custom-discord-commands). |
 
 Settings related to the internal Minecraft Bedrock server (e.g. game mode, difficulty) can be found in the `server.properties` file in the server folder.
