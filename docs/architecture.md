@@ -1,21 +1,21 @@
 # System Architecture
 
 ## Overview
-This project consists of four main packages: `core`, `bot`, `cli`, and `utils`, each encapsulating a distinct part of the system’s functionality.
+This project consists of four main packages: `core`, `bot`, `cli`, and `utils`, each encapsulating a distinct part of the system's functionality.
 
 ## Package Responsibilities
 - **core**: Contains the server process management (`server_runner`), configuration (`server_config`), and automation (`server_automation`).
 - **bot**: Manages the Discord bot integration allowing remote server control and notifications.
 - **cli**: Provides a command-line interface subscribing to server output for local user interaction.
-- **utils**: Helper modules including logging, formatting, and a broadcasting system.
+- **utils**: Helper modules including logging, output formatting, broadcasting, and Windows Job Object management.
 
-## Dependency chain (bottom to top):
+## Dependency Chain (bottom to top)
 ```
 ServerConfig (reads settings.toml)
     ↓
 ServerRunner (manages server process)
     ↓
-ServerAutomation (scheduled tasks, crash detection)
+ServerAutomation (scheduled tasks, crash detection, logging)
     ↓
 DiscordBot (Discord interface)
     ↓
@@ -23,57 +23,72 @@ CommandLineInterface (CLI with prompt_toolkit)
 ```
 
 ## Communication Patterns
-- The project uses a publish-subscribe model using `output_broadcaster` to allow communication between lower-level components and higher-level components without tight coupling. This is implemented via `LineBroadcaster` and `SignalBroadcaster` classes in the `utils` package.
+The project uses a publish-subscribe model via two broadcaster classes in `utils`:
 
-## Interaction and Flow
-- The `main.py` script initializes and coordinates these components.
-- `server_config` loads and validates configuration at startup.
-- `server_runner` controls basic server operations and pushes output and unexpected shutdown signals through the broadcast system.
-- `server_automation` subscribes to server output for logging, subscribes to unexpected shutdowns to trigger automated responses as well as re-publish them (explained later), and schedules tasks like restarts and backups.
-- `discord_bot` listens for Discord commands and interacts with `server_runner` and `server_automation` to remotely control the server.
-- `cli` subscribes to server output from `server_runner`, subscribes to unexpected shutdowns from `server_automation`, and provides a local interface for user commands.
-- `utils` provides shared functionality like the broadcaster pattern for inter-component communication, daily logging, and output formatting.
+- **`LineBroadcaster`** — publishes a 4-tuple `(level: LogLevel, timestamp: str, message: str, line: str)` to all subscribers. Used for server stdout, unexpected shutdown events, and automation output.
+
+All subscriber callbacks must match the signature of the broadcaster they subscribe to. Thread safety is ensured by copying the subscriber list under a lock before iterating, so subscribe/unsubscribe calls during publish do not cause issues.
+
+## Output Flow
+1. `server_runner._read_stdout` reads lines from the server process stdout.
+2. Each line is passed through `process_line()` which returns a `(LogLevel, timestamp, message, full_line)` 4-tuple.
+3. The 4-tuple is published via `runner.stdout_broadcaster`.
+4. `server_automation.handle_server_output` receives it, logs the full line to `BufferedDailyLogger`, and scrapes the message for the server version string.
+5. `cli` and `discord_bot` subscribe to `automation.automation_output_broadcaster` for automation-generated messages (backups, restarts, etc.) and to `runner.stdout_broadcaster` for raw server output.
+
+Custom messages (not from server stdout) are generated with `custom_line(level, message)` which returns the same 4-tuple format, keeping all subscribers consistent.
+
+## LogLevel Enum
+`LogLevel` is a multi-value enum defined in `format_helper.py`:
+```python
+class LogLevel(enum.Enum):
+    INFO     = ("INFO",     "\033[34m")
+    DEBUG    = ("DEBUG",    "\033[36m")
+    WARN     = ("WARN",     "\033[33m")
+    ERROR    = ("ERROR",    "\033[31m")
+    CRITICAL = ("CRITICAL", "\033[1;31m")
+    RAW      = ("RAW",      "\033[32m")  # Unformatted server lines
+    CLI      = ("CLI",      "\033[35m")  # CLI-generated messages
+    UNKNOWN  = ("UNKNOWN",  "\033[1;33m") # Unrecognised log level from server
+```
+Each member exposes `level.label` (the string name) and `level.ansi_code` (the ANSI escape code for colour). `level.value` returns the raw tuple and should not be used for display.
+
+`RAW` is assigned to server lines that do not match the Bedrock log format `[timestamp LEVEL] message`. `UNKNOWN` is assigned when the level string in a matched line does not correspond to a known `LogLevel` member.
+
+## Logging
+`BufferedDailyLogger` in `utils` buffers log lines in memory and flushes them to a daily rotating log file. It accepts an `on_error` callback which is invoked if a flush fails (e.g. encoding error, disk full), allowing the error to be surfaced through the broadcaster without creating a dependency loop. Log files are written as UTF-8.
+
+Debug-level messages from automation are filtered by the `automation_debug` config flag inside `log_print()` before reaching the logger or broadcaster.
 
 ## Thread Safety
-- The `ServerRunner` class employs `threading.RLock()` to ensure thread-safe operations on the server process.
-- The lock is also exposed via a context manager, allowing external components like `ServerAutomation` to perform multi-step operations atomically (e.g., stopping the server, performing a backup, and restarting the server) without race conditions.
+`ServerRunner` uses `threading.RLock()` for all access to the server process. The re-entrant lock allows `stop()` to call `send_command()` without deadlocking. The lock is also exposed via a `lock()` context manager, allowing `ServerAutomation` to perform multi-step atomic operations (e.g. stop → backup → update → start) without race conditions.
 
-## Deque-based Recent Lines Buffer
-- `ServerAutomation` maintains a deque buffer of recent server output lines to monitor for specific events (e.g., save completion) during automated tasks. 
-- Using a dequeue with a fixed maxiumum length ensures efficient memory usage while retaining the most relevant output for event detection.
-- Every item is appened to the left side of the deque, ensuring the most recent lines are always at the front for quick access.
+`LineBroadcaster` use its own `threading.Lock()` to protect the subscriber list, separate from the runner lock.
+
+## Crash Detection and Auto-Restart
+`ServerRunner` publishes to `unexpected_shutdown_broadcaster` when the server process exits without `stop()` being called first. `ServerAutomation.handle_unexpected_shutdown` receives this signal, records the crash timestamp, and automatically restarts the server unless the number of crashes within `CRASH_DETECTION_WINDOW_MINUTES` minutes exceeds `crash_limit` from config.
+
+## Scheduled Restart
+`ServerAutomation._scheduled_restart` runs on a daemon thread. Each cycle it calculates the seconds until the configured daily restart time, sleeps, warns players in-game, then stops the server, performs an offline world backup, optionally runs an update check, and restarts.
+
+## Online World Backup
+Online backups use the Bedrock `save hold` / `save query` / `save resume` sequence. During a backup, `_backup_world_online` subscribes a temporary `queue.Queue` callback to `stdout_broadcaster` to capture the server's responses to these commands. The subscription is always removed in a `try/finally` block to prevent leaking subscribers if an error occurs mid-backup.
+
+## Windows Process Lifecycle
+On Windows, `ServerRunner` assigns the `bedrock_server.exe` process to a Windows Job Object with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`. This ensures the server process is terminated if the manager exits unexpectedly (e.g. killed via Task Manager), preventing orphaned server processes. The Job Object handle is kept alive in `self._job` and closed during `stop()`. Implementation is in `utils/windows_job.py` using `ctypes`.
+
+On Linux, `prctl(PR_SET_PDEATHSIG, SIGTERM)` is set as a `preexec_fn` so the server receives SIGTERM if the manager process dies.
 
 ## Checking for Bedrock Server Updates
-- The `bedrock_download_link_fetcher` module in `utils` allows for checking for updates to the Bedrock server by fetching the latest download link from the official API. This can be used by `server_automation` to automate the update process when a new version is detected.
-- The API is of the following format as of 2026-05-04:
-    ```
-    {
-        'result':{
-            'links':[
-                {
-                    'downloadType': 'serverBedrockWindows',
-                    'downloadUrl': 'https://www.minecraft.net/bedrockdedicatedserver/bin-win/bedrock-server-1.26.14.1.zip'
-                },
-                {
-                    'downloadType': 'serverBedrockLinux',
-                    'downloadUrl': 'https://www.minecraft.net/bedrockdedicatedserver/bin-linux/bedrock-server-1.26.14.1.zip'
-                },
-                {
-                    'downloadType': 'serverBedrockPreviewWindows',
-                    'downloadUrl': 'https://www.minecraft.net/bedrockdedicatedserver/bin-win-preview/bedrock-server-1.26.30.26.zip'
-                },
-                {
-                    'downloadType': 'serverBedrockPreviewLinux',
-                    'downloadUrl': 'https://www.minecraft.net/bedrockdedicatedserver/bin-linux-preview/bedrock-server-1.26.30.26.zip'
-                },
-                {
-                    'downloadType': 'serverJar',
-                    'downloadUrl': 'https://piston-data.mojang.com/v1/objects/97ccd4c0ed3f81bbb7bfacddd1090b0c56f9bc51/server.jar'
-                }
-            ]
-        }
+The `bedrock_download_link_fetcher` module in `utils` fetches the latest Bedrock server version and download URL from the official Minecraft API. The API format as of 2026-05-04:
+```json
+{
+    "result": {
+        "links": [
+            { "downloadType": "serverBedrockWindows", "downloadUrl": "https://..." },
+            { "downloadType": "serverBedrockLinux",   "downloadUrl": "https://..." }
+        ]
     }
-    ```
-- If major changes are made to the API structure, the `bedrock_download_link_fetcher` module may need to be updated to correctly parse the new format and extract the relevant download links for the Bedrock server.
-    - There are constants defined for key strings `downloadType` and `downloadUrl` as well as the expected `downloadType` values for Windows and Linux: `serverBedrockWindows` and `serverBedrockLinux`.
-    
+}
+```
+Constants are defined for all key strings and expected `downloadType` values. If Mojang changes the API structure, only `bedrock_download_link_fetcher` needs to be updated.
