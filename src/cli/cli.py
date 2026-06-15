@@ -1,6 +1,16 @@
 from prompt_toolkit import prompt, print_formatted_text, ANSI, PromptSession
 from prompt_toolkit.patch_stdout import patch_stdout
+from prompt_toolkit.history import FileHistory
+from prompt_toolkit.completion import WordCompleter
 from utils import get_spacing, custom_line, LogLevel
+import os
+
+# Built-in CLI commands for autocomplete
+CLI_COMMANDS = [
+    ':help', ':online', ':start', ':stop', ':restart',
+    ':backup', ':list', ':mark', ':unmark', ':switch',
+    ':check', ':update', ':exit', ':quit',
+]
 
 # Constants
 BLOCKED_COMMANDS = {
@@ -81,7 +91,11 @@ class CommandLineInterface:
 
     def start(self):
         """Start the command-line interface loop."""
-        session = PromptSession()
+        history_path = os.path.join(self.config.log_folder, "cli_history")
+        session = PromptSession(
+            history=FileHistory(history_path),
+            completer=WordCompleter(CLI_COMMANDS, sentence=True),
+        )
         # Starting print messages for CLI
 
         self.log_print("Type ':help' for a list of built-in commands.")
