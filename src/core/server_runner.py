@@ -1,5 +1,5 @@
 import sys
-from utils import LineBroadcaster, SignalBroadcaster, process_line, custom_line, LogLevel, Platform, create_job_object, close_job_object
+from utils import LineBroadcaster, process_line, custom_line, LogLevel, Platform, create_job_object, close_job_object
 from contextlib import contextmanager
 import subprocess
 import threading

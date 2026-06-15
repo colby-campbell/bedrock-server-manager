@@ -43,12 +43,3 @@ class LineBroadcaster(Broadcaster):
             callbacks = self.subscribers.copy()
         for callback in callbacks:
             callback(level, timestamp, message, line)
-
-class SignalBroadcaster(Broadcaster):
-    def publish(self):
-        """Send an alert to all registered subscribers using their callback function."""
-        # Create a shallow copy of the subscriber list so the lock can be released before calling callback functions
-        with self._lock:
-            callbacks = self.subscribers.copy()
-        for callback in callbacks:
-            callback()
