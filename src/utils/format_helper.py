@@ -35,20 +35,9 @@ def get_spacing(level: LogLevel):
     Returns:
         str: The spacing string.
     """
-    return " " * (max(SPACING_LENGTH - len(level.value), 1))
+    return " " * (max(SPACING_LENGTH - len(level.label), 1))
 
 
-""" THIS WILL BE REMOVED
-def get_prefix(level: LogLevel):
-    # comment block start
-    Get the formatted prefix for a given log level.
-    Args:
-        level (LogLevel): The log level.
-    Returns:
-        str: The formatted prefix string.
-    # comment block end
-    return f"{get_timestamp()} {level.value}{get_spacing(level)}"
-"""
 def get_prefix(level: LogLevel):
     """
     Get the formatted prefix for a given log level.
@@ -57,7 +46,7 @@ def get_prefix(level: LogLevel):
     Returns:
         str: The formatted prefix string.
     """
-    return f"{get_timestamp()} {level.value}{get_spacing(level)}"
+    return f"{get_timestamp()} {level.label}{get_spacing(level)}"
 
 
 def process_line(line: str):
@@ -71,27 +60,22 @@ def process_line(line: str):
         message (str): The message.
         line (str): The complete formatted line.
     """
-    # Regex to parse log lines
     match = PROCESS_LINE_REGEX.match(line)
     if match:
         timestamp = match.group("timestamp")
         # Replace comma with colon in timestamp for consistency
         timestamp = timestamp.replace(",", ":")
         level = match.group("level")
-        # Calculate spacing for alignment
         spacing = " " * (max(SPACING_LENGTH - len(level), 1))
-        # Get the message part ('or ""' to handle None case)
         message = match.group("message") or ""
-        # Return the formatted line
         try:
             level_enum = LogLevel[match.group("level")]
         except KeyError:
             level_enum = LogLevel.UNKNOWN
         return level_enum, timestamp, message, f"{timestamp} {level}{spacing}{message}"
     else:
-        # If the line doesn't contain a timestamp, return it with a RAW level
         timestamp = get_timestamp()
-        return LogLevel.RAW, timestamp, line, f"{timestamp} {LogLevel.RAW.value}{get_spacing(LogLevel.RAW)}{line}"
+        return LogLevel.RAW, timestamp, line, f"{timestamp} {LogLevel.RAW.label}{get_spacing(LogLevel.RAW)}{line}"
 
 
 def custom_line(level: LogLevel, message: str):
@@ -107,4 +91,4 @@ def custom_line(level: LogLevel, message: str):
         line (str): The complete formatted line.
     """
     timestamp = get_timestamp()
-    return level, timestamp, message, f"{timestamp} {level.value}{get_spacing(level)}{message}"
+    return level, timestamp, message, f"{timestamp} {level.label}{get_spacing(level)}{message}"
