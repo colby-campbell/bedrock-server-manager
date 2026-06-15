@@ -1,5 +1,5 @@
 import logging
-from .format_helper import process_line
+from .format_helper import process_line, LogLevel
 
 
 # This could be moved to bot as it is only used there; however, I will leave it here for now.
@@ -13,8 +13,8 @@ class BroadcastHandler(logging.Handler):
     def emit(self, record):
         """Emit a log record by publishing it to the broadcaster."""
         msg = self.format(record)
-        timestamp, text = process_line(msg)
+        level, timestamp, message, line = process_line(msg)
         # Send the timestamp and the text to the CLI
-        self.broadcaster.publish(timestamp, text)
+        self.broadcaster.publish(level, timestamp, message, line)
         # Just combine the timestamp and the text and send it to the logger
-        self.logger.log(timestamp + text)
+        self.logger.log(line)

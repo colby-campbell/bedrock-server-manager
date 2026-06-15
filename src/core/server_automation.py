@@ -61,6 +61,9 @@ class ServerAutomation:
             level (LogLevel): The log level of the message.
             message (str): The message to log and broadcast.
         """
+        # If automation debug logging is disabled and the level is DEBUG, skip logging and broadcasting
+        if level == LogLevel.DEBUG and not self.config.automation_debug:
+            return
         lvl, ts, msg, line = custom_line(level, message)
         self.logger.log(line)
         self.automation_output_broadcaster.publish(lvl, ts, msg, line)

@@ -4,6 +4,9 @@ import discord
 import logging
 from discord.ext import commands
 
+# Make the logging module use "WARN" instead of "WARNING", required to match the log level names used in the rest of the program
+logging.addLevelName(logging.WARNING, "WARN")
+
 # Constants
 BLOCKED_COMMANDS = {
         'stop': 'stop',
@@ -44,7 +47,7 @@ class DiscordBot:
         self.automation = automation
         self.broadcaster = LineBroadcaster()
         # Create a custom broadcast handler for logging
-        self.broadcast_handler = BroadcastHandler(self.broadcaster, self.automation.logger)
+        self.broadcast_handler = BroadcastHandler(self.broadcaster, self.automation.logger, self.config.discord_debug)
         # Create a custom log formatter for logging
         self.log_formatter = logging.Formatter('[%(asctime)s %(levelname)s] %(message)s')
         intents = discord.Intents.default()
@@ -271,7 +274,12 @@ class DiscordBot:
         # Start the discord bot with custom logging
         self.running = True
         try:
-            self.bot.run(self.token, log_handler=self.broadcast_handler, log_formatter=self.log_formatter)
+            self.bot.run(
+                self.token,
+                log_handler=self.broadcast_handler,
+                log_formatter=self.log_formatter,
+                log_level=logging.DEBUG if self.config.discord_debug else logging.INFO
+            )
         except Exception as e:
             self.automation.log_print(LogLevel.ERROR, f"Error starting Discord bot: {e}")
         self.running = False

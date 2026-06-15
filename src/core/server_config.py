@@ -100,6 +100,10 @@ class ServerConfig:
     # List of server files/folders to back up before performing an update, must be relative to the server folder (worlds are always backed up).
     # Allowed Values: [string, string, ...] | all
 
+    automation_debug=false
+    # Whether to enable debug logging for server automation (not recommended unless troubleshooting).
+    # Allowed Values: true, false
+
     # platform (optional)
     # If not set, this is auto-detected.
     # Set manually only if auto-detection fails.
@@ -110,6 +114,9 @@ class ServerConfig:
     # If not set, this is auto-detected from 'f{LEVEL_NAME_KEY}' in {SERVER_PROPERTIES_FILE}.
     # Set manually only if auto-detection fails.
     #world_name=
+
+    
+    # Discord Bot Settings
 
     discord_bot=false
     # Whether to enable the Discord bot.
@@ -123,6 +130,11 @@ class ServerConfig:
     admin_list=[]
     # List of Discord user IDs with admin privileges, bot owners are always admins.
     # Allowed Values: [integer, integer, ...]
+    # Used only if discord_bot=true
+
+    discord_debug=false
+    # Whether to enable debug logging for the Discord bot (not recommended unless troubleshooting).
+    # Allowed Values: true, false
     # Used only if discord_bot=true
 
     # custom_commands (optional)
@@ -179,6 +191,8 @@ class ServerConfig:
         self.discord_bot = cfg.get("discord_bot")
         self.bot_token = cfg.get("bot_token")
         self.admins = cfg.get("admin_list")
+        self.discord_debug = cfg.get("discord_debug", False)
+        self.automation_debug = cfg.get("automation_debug", False)
         self.custom_commands = cfg.get("custom_commands", [])
 
         # Determine the platform if not set
@@ -239,9 +253,11 @@ class ServerConfig:
             self.SettingContainer(self.world_name, "world_name", self.SettingType.STRING),
             self.SettingContainer(self.update_protected_paths, "update_protected_paths", self.SettingType.LIST_OF_STRINGS),
             self.SettingContainer(self.update_backup_paths, "update_backup_paths", self.SettingType.LIST_OF_STRINGS_OR_ALL),
+            self.SettingContainer(self.automation_debug, "automation_debug", self.SettingType.BOOLEAN),
             self.SettingContainer(self.discord_bot, "discord_bot", self.SettingType.BOOLEAN),
             self.SettingContainer(self.bot_token, "bot_token", self.SettingType.STRING) if self.discord_bot else None,
             self.SettingContainer(self.admins, "admin_list", self.SettingType.LIST_OF_INTEGERS) if self.discord_bot else None,
+            self.SettingContainer(self.discord_debug, "discord_debug", self.SettingType.BOOLEAN) if self.discord_bot else None,
             self.SettingContainer(self.custom_commands, "custom_commands", self.SettingType.CURRENT_TABLE) if self.discord_bot else None
         )
 
