@@ -112,17 +112,9 @@ class BedrockCompleter(Completer):
             arg_index (int): Positional index within node.completions for the next completion
             current_word (str): The partial token being typed
         """
-        # If there are children, complete with them instead of the argument completions
-        children = node.get('children', {})
-        if children:
-            for name in children:
-                if name.lower().startswith(current_word.lower()):
-                    yield Completion(name, start_position=-len(current_word))
-            return
-
-        # Otherwise, complete with the argument completions
+        # If there are argument completions, do those first
         comp_list = node.get('completions', [])
-        if arg_index < len(comp_list):
+        if comp_list and arg_index < len(comp_list):
             # Grab the completion info for the current argument
             comp = comp_list[arg_index]
             candidates = []
@@ -137,6 +129,13 @@ class BedrockCompleter(Completer):
             for value in candidates:
                 if value.lower().startswith(current_word.lower()):
                     yield Completion(value, start_position=-len(current_word))
+        #  Otherwise complete with them the children
+        else:
+            children = node.get('children', {})
+            if children:
+                for name in children:
+                    if name.lower().startswith(current_word.lower()):
+                        yield Completion(name, start_position=-len(current_word))
 
     def get_completions(self, document, _complete_event):
         """Yield completions for the current input."""
