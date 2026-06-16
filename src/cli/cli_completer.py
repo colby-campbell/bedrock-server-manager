@@ -118,24 +118,30 @@ class BedrockCompleter(Completer):
             # Grab the completion info for the current argument
             comp = comp_list[arg_index]
             candidates = []
+            goto_children = False
             match comp['type']:
+                case 'skip':
+                    return # No completions for this argument
+                case 'goto-children':
+                    goto_children = True
                 case 'players':
                     candidates = self._get_players()
                 case 'backups':
                     candidates = self._get_backups() + comp.get('extras', [])
                 case 'enum':
                     candidates = comp['values']
-            # If any candidates start with the current word, yield a completion for it
-            for value in candidates:
-                if value.lower().startswith(current_word.lower()):
-                    yield Completion(value, start_position=-len(current_word))
-        #  Otherwise complete with them the children
-        else:
-            children = node.get('children', {})
-            if children:
-                for name in children:
-                    if name.lower().startswith(current_word.lower()):
-                        yield Completion(name, start_position=-len(current_word))
+            if not goto_children:
+                # If any candidates start with the current word, yield a completion for it
+                for value in candidates:
+                    if value.lower().startswith(current_word.lower()):
+                        yield Completion(value, start_position=-len(current_word))
+                return
+        # Otherwise complete with them the children
+        children = node.get('children', {})
+        if children:
+            for name in children:
+                if name.lower().startswith(current_word.lower()):
+                    yield Completion(name, start_position=-len(current_word))
 
     def get_completions(self, document, _complete_event):
         """Yield completions for the current input."""
