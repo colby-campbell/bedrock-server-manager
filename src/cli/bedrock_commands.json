@@ -1,0 +1,92 @@
+{
+    "categories": {
+        "game": [
+            "stuff"
+        ],
+        "server": [
+            "allowlist", "changesetting", "deop", "kick", "list", "op",
+            "ops", "permission", "setmaxplayers", "transfer", "whitelist"
+        ]
+    },
+    "commands": {
+        "allowlist": { 
+            "args": ["<add|remove|list|on|off|reload>"],
+            "children": {
+                "add": {"args": ["<player: target>"], "completions": [{"type": "players"}]},
+                "remove": {"args": ["<player: target>"], "completions": [{"type": "players"}]},
+                "list": {"args": []},
+                "on": {"args": []},
+                "off": {"args": []},
+                "reload": {"args": []}
+            }
+        },
+        "changesetting": {
+            "args": ["<allow-cheats|difficulty>"],
+            "children": {
+                "allow-cheats": {"args": ["<true|false>"], "completions": [{"type": "enum", "values": ["true", "false"]}]},
+                "difficulty": {"args": ["<peaceful|easy|normal|hard>"], "completions": [{"type": "enum", "values": ["peaceful", "easy", "normal", "hard"]}]}
+            }
+        },
+        "deop": {
+            "args": ["<player: target>"],
+            "completions": [
+                {"type": "players"}
+            ]
+        },
+        "kick": {
+            "args": ["<player: target>", "[reason: string]"],
+            "completions": [
+                {"type": "players"}
+            ]
+        },
+        "list": {
+            "args": []
+        },
+        "op": {
+            "args": ["<player: target>"],
+            "completions": [
+                {"type": "players"}
+            ]
+        },
+        "ops": {
+            "args": ["<list|reload>"],
+            "completions": [
+                {"type": "enum", "values": ["list", "reload"]}
+            ]
+        },
+        "permission": {
+            "args": ["<list|reload|set>"],
+            "children": {
+                "list":   {"args": []},
+                "reload": {"args": []},
+                "set": {
+                    "args": ["<player: target>", "<visitor|member|operator>"],
+                    "completions": [
+                        {"type": "players"},
+                        {"type": "enum", "values": ["visitor", "member", "operator"]}
+                    ]
+                }
+            }
+        },
+        "setmaxplayers": {
+            "args": ["<maxPlayers: int>"]
+        },
+        "transfer": {
+            "args": ["<pfidOrMSA: string>", "<server: string>", "<port: int>"],
+            "completions": [
+                {"type": "players"}
+            ]
+        },
+        "whitelist": {
+            "args": ["<add|remove|list|on|off|reload>"],
+            "children": {
+                "add":    {"args": ["<player: target>"], "completions": [{"type": "players"}]},
+                "remove": {"args": ["<player: target>"], "completions": [{"type": "players"}]},
+                "list":   {"args": []},
+                "on":     {"args": []},
+                "off":    {"args": []},
+                "reload": {"args": []}
+            }
+        }
+    }
+}
