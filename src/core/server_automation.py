@@ -21,6 +21,9 @@ SUCCESS_PATTERN = re.compile(r"Data saved. Files are now ready to be copied.", r
 FAIL_PATTERN = re.compile(r"A previous save has not been completed.", re.IGNORECASE)
 DATE_PATTERN = re.compile(r'^\d{4}-\d{2}-\d{2}$')
 PLAYERS_ONLINE_PATTERN = re.compile(r"There are (\d+)\/(\d+) players online:")
+VERSION_PATTERN     = re.compile(r"Version: (?P<version>[\d.]+)")
+PLAYER_CONNECT_PATTERN    = re.compile(r"Player connected: (?P<player>[^,]+),")
+PLAYER_DISCONNECT_PATTERN = re.compile(r"Player disconnected: (?P<player>[^,]+),")
 SAVE_QUERY_TIMEOUT_SECONDS = 10
 DOWNLOAD_CONNECT_TIMEOUT_SECONDS = 10
 DOWNLOAD_READ_TIMEOUT_SECONDS = 300
@@ -49,9 +52,9 @@ class ServerAutomation:
             self.config.log_folder,
             on_error=lambda msg: self.automation_output_broadcaster.publish(*custom_line(LogLevel.ERROR, f"Error writing to log file: {msg}"))
         )
-        # Create a list of crashes
         self.recent_crashes = []
         self.current_version = None
+        self.online_players = []
 
 
     def log_print(self, level: LogLevel, message: str):
@@ -88,8 +91,23 @@ class ServerAutomation:
             line (str): The output line from the server.
         """
         # Scrape the line for the version number to use in update checks
-        if (message.startswith("Version:")):
-            self.current_version = message.split("Version:")[1].strip()
+        if message.startswith("Version:"):
+            match = VERSION_PATTERN.match(message)
+            if match:
+                self.current_version = match.group("version")
+        # Scrape the line for the player connected message to update the online players list
+        elif message.startswith("Player connected:"):
+            match = PLAYER_CONNECT_PATTERN.match(message)
+            if match:
+                player = match.group("player")
+                self.online_players.append(player)
+        # Scrape the line for the player disconnected message to update the online players list
+        elif message.startswith("Player disconnected:"):
+            match = PLAYER_DISCONNECT_PATTERN.match(message)
+            if match:
+                player = match.group("player")
+                if player in self.online_players:
+                    self.online_players.remove(player)
         self.logger.log(line)
 
 
@@ -473,8 +491,8 @@ class ServerAutomation:
             return f"Backup completed: {result.name}" if result else "Backup failed."
 
 
-    def list_backups(self):
-        """List existing backups in the backup directory."""
+    def get_backups(self):
+        """Get a list of existing backups in the backup directory."""
         backup_root = Path(self.backup_folder)
 
         backups = []
@@ -483,6 +501,12 @@ class ServerAutomation:
                 # Only list valid backups
                 if backup.name.startswith(OFFLINE_BACKUP_PREFIX) or backup.name.startswith(ONLINE_BACKUP_PREFIX) or backup.name.startswith(PROTECTED_BACKUP_PREFIX):
                     backups.append(backup.name)
+        return backups
+
+
+    def list_backups(self):
+        """List existing backups in the backup directory."""
+        backups = self.get_backups()
         if backups:
             # TODO: Format output better
             return f"Existing backups: {', '.join(backups)}"

@@ -1,26 +1,20 @@
-from prompt_toolkit import prompt, print_formatted_text, ANSI, PromptSession
+from prompt_toolkit import print_formatted_text, ANSI, PromptSession
 from prompt_toolkit.patch_stdout import patch_stdout
 from prompt_toolkit.history import FileHistory
-from prompt_toolkit.completion import WordCompleter
 from utils import get_spacing, custom_line, LogLevel
+from .cli_completer import BedrockCompleter, BedrockAutoSuggest, load_commands
 import os
 
-# Built-in CLI commands for autocomplete
-CLI_COMMANDS = [
-    ':help', ':online', ':start', ':stop', ':restart',
-    ':backup', ':list', ':mark', ':unmark', ':switch',
-    ':check', ':update', ':exit', ':quit',
-]
-
 # Constants
+CLI_HISTORY_FILE = "cli_history"
 BLOCKED_COMMANDS = {
-        'stop': 'stop',
-        'start': 'start',
-        'restart': 'restart',
-        'exit': 'exit',
-        'quit': 'quit',
-        'save': 'backup'
-    }
+    'stop': 'stop',
+    'start': 'start',
+    'restart': 'restart',
+    'exit': 'exit',
+    'quit': 'quit',
+    'save': 'backup'
+}
 
 
 def add_colour(level, timestamp, message):
@@ -91,13 +85,15 @@ class CommandLineInterface:
 
     def start(self):
         """Start the command-line interface loop."""
-        history_path = os.path.join(self.config.log_folder, "cli_history")
+        history_path = os.path.join(self.config.log_folder, CLI_HISTORY_FILE)
+        commands, _ = load_commands()
         session = PromptSession(
             history=FileHistory(history_path),
-            completer=WordCompleter(CLI_COMMANDS, sentence=True),
+            # Provide a lambda for online players and backups so that the completer can access the latest data
+            completer=BedrockCompleter(commands, lambda: self.automation.online_players, lambda: self.automation.get_backups()),
+            auto_suggest=BedrockAutoSuggest(commands),
         )
         # Starting print messages for CLI
-
         self.log_print("Type ':help' for a list of built-in commands.")
         self.log_print(f"Discord bot is {'ENABLED' if self.discord_bot else 'DISABLED'}")
         # Main input loop
