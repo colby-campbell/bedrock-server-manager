@@ -217,7 +217,7 @@ class BedrockAutoSuggest(AutoSuggest):
             remaining = args_syntax[arg_index + 1:]
             if not remaining:
                 return None
-            return Suggestion(' ' + ' '.join(remaining))
+            return Suggestion('  ' + ' '.join(remaining))
         # Otherwise, we are either at a non-leaf node or we are at a leaf node but there is no current word
         elif not current_word:
             remaining = args_syntax[arg_index:]
