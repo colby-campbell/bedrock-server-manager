@@ -20,12 +20,131 @@
                 "reload": {"args": []}
             }
         },
+        "aimassist": {
+            "args": ["<players: target>"],
+            "completions": [
+                {"type": "players"}
+            ],
+            "children": {
+                "clear": {"args": []},
+                "set": {
+                    "args": [
+                        "[x angle: float]", "[y angle: float]", "[max distance: float]",
+                        "[target mode: AimAssistTargetMode]", "[preset id: string]"
+                    ],
+                    "completions": [
+                        {"type": "skip"},
+                        {"type": "skip"},
+                        {"type": "skip"},
+                        {"type": "enum", "values": ["angle", "distance"]}
+                    ]
+                }
+            }
+        },
+        "alwaysday": {
+            "args": ["[lock: Boolean]"],
+            "completions": [
+                {"type": "enum", "values": ["true", "false"]}
+            ]
+        },
+        "camera": {
+            "args": ["<players: target>", "<subcommand: see /help camera>"],
+            "completions": [{"type": "players"}]
+        },
+        "camerashake": {
+            "children": {
+                "add": {
+                    "args": ["<player: target>", "[intensity: float]", "[seconds: float]", "[shakeType: CameraShakeType]"],
+                    "completions": [
+                        {"type": "players"},
+                        {"type": "skip"},
+                        {"type": "skip"},
+                        {"type": "enum", "values": ["positional", "rotational"]}
+                    ]
+                },
+                "stop": {
+                    "args": ["[player: target]"],
+                    "completions": [
+                        {"type": "players"}
+                    ]
+                }
+            }
+        },
         "changesetting": {
             "args": ["<allow-cheats|difficulty>"],
             "children": {
                 "allow-cheats": {"args": ["<true|false>"], "completions": [{"type": "enum", "values": ["true", "false"]}]},
                 "difficulty": {"args": ["<peaceful|easy|normal|hard>"], "completions": [{"type": "enum", "values": ["peaceful", "easy", "normal", "hard"]}]}
             }
+        },
+        "clear": {
+            "args": ["[player: target]", "[itemName: Item]", "[data: int]", "[maxCount: int]"],
+            "completions": [{"type": "players"}]
+        },
+        "clearspawnpoint": {
+            "args": ["[player: target]"],
+            "completions": [{"type": "players"}]
+        },
+        "clone": {
+            "args": ["<begin: x>", "<y>", "<z>", "<end: x>", "<y>", "<z>", "<destination: x>", "<y>", "<z>", "[maskMode: MaskMode]", "[cloneMode: CloneMode]"],
+            "completions": [
+                {"type": "skip"}, {"type": "skip"}, {"type": "skip"},
+                {"type": "skip"}, {"type": "skip"}, {"type": "skip"},
+                {"type": "skip"}, {"type": "skip"}, {"type": "skip"},
+                {"type": "goto-children"}
+            ],
+            "children": {
+                "replace": {
+                    "args": ["[cloneMode: CloneMode]"],
+                    "completions": [
+                        {"type": "enum", "values": ["force", "move", "normal"]}
+                    ]
+                },
+                "masked": {
+                    "args": ["[cloneMode: CloneMode]"],
+                    "completions": [
+                        {"type": "enum", "values": ["force", "move", "normal"]}
+                    ]
+                },
+                "filtered": {
+                    "args": ["<cloneMode: CloneMode>", "<tileName: Block>", "[blockStates: block states]"],
+                    "completions": [
+                        {"type": "enum", "values": ["force", "move", "normal"]}
+                    ]
+                }
+            }
+        },
+        "connect": {
+            "args": ["<serverUri: text>"]
+        },
+        "controlscheme": {
+            "args": ["<players: target>", "<clear|set>"],
+            "completions": [
+                {"type": "players"}
+            ],
+            "children": {
+                "clear": {
+                    "args": []
+                },
+                "set": {
+                    "args": ["<scheme: ControlScheme>"],
+                    "completions": [
+                        {
+                            "type": "enum",
+                            "values": [
+                                "camera_relative", "camera_relative_strafe", "locked_player_relative_strafe",
+                                "player_relative", "player_relative_strafe"
+                            ]
+                        }
+                    ]
+                }
+            }
+        },
+        "daylock": {
+            "args": ["[lock: Boolean]"],
+            "completions": [
+                {"type": "enum", "values": ["true", "false"]}
+            ]
         },
         "deop": {
             "args": ["<player: target>"],
