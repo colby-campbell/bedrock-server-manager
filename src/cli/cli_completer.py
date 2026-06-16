@@ -136,12 +136,13 @@ class BedrockCompleter(Completer):
                     if value.lower().startswith(current_word.lower()):
                         yield Completion(value, start_position=-len(current_word))
                 return
-        # Otherwise complete with them the children
-        children = node.get('children', {})
-        if children:
-            for name in children:
-                if name.lower().startswith(current_word.lower()):
-                    yield Completion(name, start_position=-len(current_word))
+            else:
+                # Otherwise complete with them the children
+                children = node.get('children', {})
+                if children:
+                    for name in children:
+                        if name.lower().startswith(current_word.lower()):
+                            yield Completion(name, start_position=-len(current_word))
 
     def get_completions(self, document, _complete_event):
         """Yield completions for the current input."""
@@ -216,17 +217,9 @@ class BedrockAutoSuggest(AutoSuggest):
         if not args_syntax:
             return None
 
-        # Are we at a leaf node with a current word? (i.e. no more subcommands)
-        if current_word and not node.get('children'):
-            # Show the argument syntax for the next arguments, not including the current one
-            remaining = args_syntax[arg_index + 1:]
-            if not remaining:
-                return None
-            return Suggestion('  ' + ' '.join(remaining))
-        # Otherwise, we are either at a non-leaf node or we are at a leaf node but there is no current word
-        elif not current_word:
-            remaining = args_syntax[arg_index:]
-            if not remaining:
-                return None
-            prefix = ' ' if trailing_space else '  '
-            return Suggestion(prefix + ' '.join(remaining))
+        # If current_word, show the next argument, otherwise show the current argument
+        remaining = args_syntax[arg_index + 1:] if current_word else args_syntax[arg_index:]
+        if not remaining:
+            return None
+        prefix = ' ' if trailing_space else '  '
+        return Suggestion(prefix + ' '.join(remaining))
