@@ -214,6 +214,25 @@
                 }
             }
         },
+        "enchant": {
+            "args": ["<player: target>", "<enchantmentName: Enchant>", "[level: int]"],
+            "completions": [
+                {"type": "players"},
+                {
+                    "type": "enum",
+                    "values": [
+                        "aqua_affinity", "bane_of_arthropods", "blast_protection", "breach",
+                        "channeling", "binding", "vanishing", "density", "depth_strider",
+                        "efficiency", "feather_falling", "fire_aspect", "fire_protection",
+                        "flame", "fortune", "frost_walker", "impaling", "infinity", "knockback",
+                        "looting", "loyalty", "luck_of_the_sea", "lunge", "lure", "mending", "multishot",
+                        "piercing", "power", "projectile_protection", "protection", "punch", "quick_charge",
+                        "respiration", "riptide", "sharpness", "silk_touch", "smite", "soul_speed",
+                        "sweeping_edge", "swift_sneak", "thorns", "unbreaking", "wind_burst"
+                    ]
+                }
+            ]
+        },
         "kick": {
             "args": ["<player: target>", "[reason: string]"],
             "completions": [
