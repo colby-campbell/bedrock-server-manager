@@ -175,11 +175,6 @@ class BedrockCompleter(Completer):
                     if cmd.lower().startswith(word.lower()):
                         yield Completion(cmd, start_position=-len(word))
 
-        # Bedrock command argument completion
-        node, arg_index, current_word = _navigate(self._commands, tokens, trailing_space)
-        if node is not None:
-            yield from self._yield_completions(node, arg_index, current_word)
-
 
 class BedrockAutoSuggest(AutoSuggest):
     def __init__(self, commands):
