@@ -21,7 +21,7 @@
             }
         },
         "aimassist": {
-            "args": ["<players: target>"],
+            "args": ["<players: target>", "<clear|set>"],
             "completions": [
                 {"type": "players"}
             ],
@@ -174,18 +174,10 @@
             ]
         },
         "permission": {
-            "args": ["<list|reload|set>"],
-            "children": {
-                "list":   {"args": []},
-                "reload": {"args": []},
-                "set": {
-                    "args": ["<player: target>", "<visitor|member|operator>"],
-                    "completions": [
-                        {"type": "players"},
-                        {"type": "enum", "values": ["visitor", "member", "operator"]}
-                    ]
-                }
-            }
+            "args": ["<list|reload>"],
+            "completions": [
+                {"type": "enum", "values": ["list", "reload"]}
+            ]
         },
         "setmaxplayers": {
             "args": ["<maxPlayers: int>"]
