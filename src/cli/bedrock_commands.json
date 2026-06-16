@@ -11,6 +11,9 @@
     "commands": {
         "allowlist": { 
             "args": ["<add|remove|list|on|off|reload>"],
+            "completions": [
+                {"type": "goto-children"}
+            ],
             "children": {
                 "add": {"args": ["<player: target>"], "completions": [{"type": "players"}]},
                 "remove": {"args": ["<player: target>"], "completions": [{"type": "players"}]},
@@ -23,7 +26,8 @@
         "aimassist": {
             "args": ["<players: target>", "<clear|set>"],
             "completions": [
-                {"type": "players"}
+                {"type": "players"},
+                {"type": "goto-children"}
             ],
             "children": {
                 "clear": {"args": []},
@@ -52,6 +56,10 @@
             "completions": [{"type": "players"}]
         },
         "camerashake": {
+            "args": ["<add|stop>"],
+            "completions": [
+                {"type": "goto-children"}
+            ],
             "children": {
                 "add": {
                     "args": ["<player: target>", "[intensity: float]", "[seconds: float]", "[shakeType: CameraShakeType]"],
@@ -72,9 +80,12 @@
         },
         "changesetting": {
             "args": ["<allow-cheats|difficulty>"],
+            "completions": [
+                {"type": "goto-children"}
+            ],
             "children": {
-                "allow-cheats": {"args": ["<true|false>"], "completions": [{"type": "enum", "values": ["true", "false"]}]},
-                "difficulty": {"args": ["<peaceful|easy|normal|hard>"], "completions": [{"type": "enum", "values": ["peaceful", "easy", "normal", "hard"]}]}
+                "allow-cheats": {"args": ["<value: Boolean>"], "completions": [{"type": "enum", "values": ["true", "false"]}]},
+                "difficulty": {"args": ["<value: Difficulty>"], "completions": [{"type": "enum", "values": ["peaceful", "easy", "normal", "hard"]}]}
             }
         },
         "clear": {
@@ -120,7 +131,8 @@
         "controlscheme": {
             "args": ["<players: target>", "<clear|set>"],
             "completions": [
-                {"type": "players"}
+                {"type": "players"},
+                {"type": "goto-children"}
             ],
             "children": {
                 "clear": {
@@ -140,6 +152,12 @@
                 }
             }
         },
+        "damage": {
+            "args": ["<target: target>", "<amount: int>", "[cause: DamageCause]"],
+            "completions": [
+                {"type": "players"}
+            ]
+        },
         "daylock": {
             "args": ["[lock: Boolean]"],
             "completions": [
@@ -151,6 +169,50 @@
             "completions": [
                 {"type": "players"}
             ]
+        },
+        "dialogue": {
+            "args": ["<open|change>"],
+            "completions": [
+                {"type": "goto-children"}
+            ],
+            "children": {
+                "open": {
+                    "args": ["<npc: target>", "<player: target>", "[sceneName: string]"],
+                    "completions": [
+                        {"type": "skip"},
+                        {"type": "players"}
+                    ]
+                },
+                "change": {
+                    "args": ["<npc: target>", "<sceneName: string>", "[player: target]"],
+                    "completions": [
+                        {"type": "skip"},
+                        {"type": "skip"},
+                        {"type": "players"}
+                    ]
+                }
+            }
+        },
+        "difficulty": {
+            "args": ["<difficulty: Difficulty>"],
+            "completions": [
+                {"type": "enum", "values": ["peaceful", "easy", "normal", "hard"]}
+            ]
+        },
+        "effect": {
+            "args": ["<player: target>", "<effect: Effect>", "[seconds:int]", "[amplifier:int]", "[hideParticles: Boolean]"],
+            "completions": [
+                {"type": "players"},
+                {"type": "goto-children"},
+                {"type": "skip"},
+                {"type": "skip"},
+                {"type": "enum", "values": ["true", "false"]}
+            ],
+            "children": {
+                "clear": {
+                    "args": ["[effect: Effect]"]
+                }
+            }
         },
         "kick": {
             "args": ["<player: target>", "[reason: string]"],
@@ -190,6 +252,9 @@
         },
         "whitelist": {
             "args": ["<add|remove|list|on|off|reload>"],
+            "completions": [
+                {"type": "goto-children"}
+            ],
             "children": {
                 "add":    {"args": ["<player: target>"], "completions": [{"type": "players"}]},
                 "remove": {"args": ["<player: target>"], "completions": [{"type": "players"}]},
