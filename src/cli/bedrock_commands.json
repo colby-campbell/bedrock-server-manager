@@ -1,7 +1,8 @@
 {
     "categories": {
         "game": [
-            "stuff"
+            "aimassist", "alwaysday", "camera", "camerashake", "clear", "clearspawnpoint", "clone",
+            "controlscheme", "damage", "daylock", "dialogue", "difficulty", "effect", "enchant"
         ],
         "server": [
             "allowlist", "changesetting", "deop", "kick", "list", "op",
@@ -48,7 +49,7 @@
         "alwaysday": {
             "args": ["[lock: Boolean]"],
             "completions": [
-                {"type": "enum", "values": ["true", "false"]}
+                {"type": "boolean"}
             ]
         },
         "camera": {
@@ -84,7 +85,7 @@
                 {"type": "goto-children"}
             ],
             "children": {
-                "allow-cheats": {"args": ["<value: Boolean>"], "completions": [{"type": "enum", "values": ["true", "false"]}]},
+                "allow-cheats": {"args": ["<value: Boolean>"], "completions": [{"type": "boolean"}]},
                 "difficulty": {"args": ["<value: Difficulty>"], "completions": [{"type": "enum", "values": ["peaceful", "easy", "normal", "hard"]}]}
             }
         },
@@ -153,15 +154,19 @@
             }
         },
         "damage": {
-            "args": ["<target: target>", "<amount: int>", "[cause: DamageCause]"],
+            "args": ["<target: target>", "<amount: int>", "[cause: DamageCause]", "entity", "<damager: target>"],
             "completions": [
+                {"type": "players"},
+                {"type": "skip"},
+                {"type": "skip"},
+                {"type": "enum", "values": ["entity"]},
                 {"type": "players"}
             ]
         },
         "daylock": {
             "args": ["[lock: Boolean]"],
             "completions": [
-                {"type": "enum", "values": ["true", "false"]}
+                {"type": "boolean"}
             ]
         },
         "deop": {
@@ -179,14 +184,14 @@
                 "open": {
                     "args": ["<npc: target>", "<player: target>", "[sceneName: string]"],
                     "completions": [
-                        {"type": "skip"},
+                        {"type": "players"},
                         {"type": "players"}
                     ]
                 },
                 "change": {
                     "args": ["<npc: target>", "<sceneName: string>", "[player: target]"],
                     "completions": [
-                        {"type": "skip"},
+                        {"type": "players"},
                         {"type": "skip"},
                         {"type": "players"}
                     ]
@@ -200,13 +205,13 @@
             ]
         },
         "effect": {
-            "args": ["<player: target>", "<effect: Effect>", "[seconds:int]", "[amplifier:int]", "[hideParticles: Boolean]"],
+            "args": ["<player: target>", "<clear|effect: Effect>", "[seconds:int]", "[amplifier:int]", "[hideParticles: Boolean]"],
             "completions": [
                 {"type": "players"},
                 {"type": "goto-children"},
                 {"type": "skip"},
                 {"type": "skip"},
-                {"type": "enum", "values": ["true", "false"]}
+                {"type": "boolean"}
             ],
             "children": {
                 "clear": {
@@ -233,14 +238,244 @@
                 }
             ]
         },
+        "event": {
+            "args": ["entity", "<target: target>", "<eventName: string>"],
+            "completions": [
+                {"type": "enum", "values": ["entity"]},
+                {"type": "players"}
+            ]
+        },
+        "execute": {
+            "args": ["<subcommand: see /help execute>"]
+        },
+        "fill": {
+            "args": ["<from: x>", "<y>", "<z>", "<to: x>", "<y>", "<z>", "<tileName: Block>", "[replace|oldBlockHandling: FillMode]"],
+            "completions": [
+                {"type": "skip"}, {"type": "skip"}, {"type": "skip"},
+                {"type": "skip"}, {"type": "skip"}, {"type": "skip"},
+                {"type": "skip"},
+                {"type": "goto-children"}
+            ],
+            "children": {
+                "replace": {"args": ["[replaceTileName: Block]", "[replaceBlockStates: block states]"]},
+                "destroy": {"args": []},
+                "hollow": {"args": []},
+                "keep": {"args": []},
+                "outline": {"args": []}
+            }
+        },
+        "fog": {
+            "args": ["<victim: target>", "<push|pop|remove>"],
+            "completions": [
+                {"type": "players"},
+                {"type": "goto-children"}
+            ],
+            "children": {
+                "push": {"args": ["<fogId: string>", "<userProvidedId: string>"]},
+                "pop": {"args": ["<userProvidedId: string>"]},
+                "remove": {"args": ["<userProvidedId: string>"]}
+            }
+        },
+        "function": {
+            "args": ["<name: filepath>"]
+        },
+        "gamemode": {
+            "args": ["<gameMode: GameMode>", "[player: target]"],
+            "completions": [
+                {"type": "enum", "values": ["adventure", "creative", "default", "spectator", "survival"]},
+                {"type": "players"}
+            ]
+        },
+        "gamerule": {
+            "args": ["<rule: GameRule>"],
+            "completions": [
+                {"type": "goto-children"}
+            ],
+            "children": {
+                "commandblockoutput": {"args": ["[value: Boolean]"], "completions": [{"type": "boolean"}]},
+                "commandblocksenabled": {"args": ["[value: Boolean]"], "completions": [{"type": "boolean"}]},
+                "dodaylightcycle": {"args": ["[value: Boolean]"], "completions": [{"type": "boolean"}]},
+                "doentitydrops": {"args": ["[value: Boolean]"], "completions": [{"type": "boolean"}]},
+                "dofiretick": {"args": ["[value: Boolean]"], "completions": [{"type": "boolean"}]},
+                "doimmediaterespawn": {"args": ["[value: Boolean]"], "completions": [{"type": "boolean"}]},
+                "doinsomnia": {"args": ["[value: Boolean]"], "completions": [{"type": "boolean"}]},
+                "dolimitedcrafting": {"args": ["[value: Boolean]"], "completions": [{"type": "boolean"}]},
+                "domobloot": {"args": ["[value: Boolean]"], "completions": [{"type": "boolean"}]},
+                "domobspawning": {"args": ["[value: Boolean]"], "completions": [{"type": "boolean"}]},
+                "dotiledrops": {"args": ["[value: Boolean]"], "completions": [{"type": "boolean"}]},
+                "doweathercycle": {"args": ["[value: Boolean]"], "completions": [{"type": "boolean"}]},
+                "drowningdamage": {"args": ["[value: Boolean]"], "completions": [{"type": "boolean"}]},
+                "falldamage": {"args": ["[value: Boolean]"], "completions": [{"type": "boolean"}]},
+                "firedamage": {"args": ["[value: Boolean]"], "completions": [{"type": "boolean"}]},
+                "freezedamage": {"args": ["[value: Boolean]"], "completions": [{"type": "boolean"}]},
+                "functioncommandlimit": {"args": ["[value: int]"]},
+                "keepinventory": {"args": ["[value: Boolean]"], "completions": [{"type": "boolean"}]},
+                "maxcommandchainlength": {"args": ["[value: int]"]},
+                "mobgriefing": {"args": ["[value: Boolean]"], "completions": [{"type": "boolean"}]},
+                "naturalregeneration": {"args": ["[value: Boolean]"], "completions": [{"type": "boolean"}]},
+                "playerssleepingpercentage": {"args": ["[value: int]"]},
+                "playerwaypoints": {"args": ["[value: Boolean]"], "completions": [{"type": "enum", "values": ["everyone", "off"]}]},
+                "projectilescanbreakblocks": {"args": ["[value: Boolean]"], "completions": [{"type": "boolean"}]},
+                "pvp": {"args": ["[value: Boolean]"], "completions": [{"type": "boolean"}]},
+                "randomtickspeed": {"args": ["[value: int]"]},
+                "recipesunlock": {"args": ["[value: Boolean]"], "completions": [{"type": "boolean"}]},
+                "respawnblocksexplode": {"args": ["[value: Boolean]"], "completions": [{"type": "boolean"}]},
+                "sendcommandfeedback": {"args": ["[value: Boolean]"], "completions": [{"type": "boolean"}]},
+                "showbordereffect": {"args": ["[value: Boolean]"], "completions": [{"type": "boolean"}]},
+                "showcoordinates": {"args": ["[value: Boolean]"], "completions": [{"type": "boolean"}]},
+                "showdaysplayed": {"args": ["[value: Boolean]"], "completions": [{"type": "boolean"}]},
+                "showdeathmessages": {"args": ["[value: Boolean]"], "completions": [{"type": "boolean"}]},
+                "showrecipemessages": {"args": ["[value: Boolean]"], "completions": [{"type": "boolean"}]},
+                "showtags": {"args": ["[value: Boolean]"], "completions": [{"type": "boolean"}]},
+                "spawnradius": {"args": ["[value: int]"]},
+                "tntexplodes": {"args": ["[value: Boolean]"], "completions": [{"type": "boolean"}]},
+                "tntexplosiondropdecay": {"args": ["[value: Boolean]"], "completions": [{"type": "boolean"}]}
+            }
+        },
+        "gametest": {
+            "args": ["<subcommand: see /help gametest>"]
+        },
+        "gametips": {
+            "args": ["<status: Status>"],
+            "completions": [{"type": "enum", "values": ["disable", "enable"]}]
+        },
+        "give": {
+            "args": ["<player: target>", "<itemName: Item>", "[amount: int]", "[data: int]", "[components: json]"],
+            "completions": [{"type": "players"}]
+        },
+        "help": {
+            "args": ["[page: int|command: CommandName]"]
+        },
+        "hud": {
+            "args": ["<target: target>", "<visible: HudVisibility>", "[hud_element: HudElement]"],
+            "completions": [
+                {"type": "players"},
+                {"type": "enum", "values": ["hide", "reset"]}
+            ]
+        },
+        "inputpermission": {
+            "args": ["<targets: target>", "<query|set>"],
+            "completions": [
+                {"type": "players"},
+                {"type": "goto-children"}
+            ],
+            "children": {
+                "query": {
+                    "args": ["<permission: permission>", "[state: state]"],
+                    "completions": [
+                        {"type": "enum", "values": [
+                            "camera", "dismount", "jump", "lateral_movement", "mount", "move_backward",
+                            "move_forward", "move_left", "move_right", "movement", "sneak"
+                        ]},
+                        {"type": "enum", "values": ["disabled", "enabled"]}
+                    ]
+                },
+                "set": {
+                    "args": ["<permission: permission>", "<state: state>"],
+                    "completions": [
+                        {"type": "enum", "values": [
+                            "camera", "dismount", "jump", "lateral_movement", "mount", "move_backward",
+                            "move_forward", "move_left", "move_right", "movement", "sneak"
+                        ]},
+                        {"type": "enum", "values": ["disabled", "enabled"]}
+                    ]
+                }
+            }
+        },
         "kick": {
             "args": ["<player: target>", "[reason: string]"],
             "completions": [
                 {"type": "players"}
             ]
         },
+        "kill": {
+            "args": ["[target: target]"],
+            "completions": [
+                {"type": "players"}
+            ]
+        },
         "list": {
             "args": []
+        },
+        "locate": {
+            "args": ["<biome|structure>"],
+            "completions": [{"type": "goto-children"}],
+            "children": {
+                "biome": {
+                    "args": ["<biome: Biome>"],
+                    "completions": [
+                        {"type": "enum", "values": [
+                            "minecraft:bamboo_jungle", "minecraft:bamboo_jungle_hills", "minecraft:basalt_deltas", "minecraft:beach", "minecraft:birch_forest",
+                            "minecraft:birch_forest_hills", "minecraft:birch_forest_hills_mutated", "minecraft:birch_forest_mutated", "minecraft:cherry_grove",
+                            "minecraft:cold_beach", "minecraft:cold_ocean", "minecraft:cold_taiga", "minecraft:cold_taiga_hills", "minecraft:cold_taiga_mutated",
+                            "minecraft:crimson_forest", "minecraft:dappled_forest", "minecraft:deep_cold_ocean", "minecraft:deep_dark", "minecraft:deep_frozen_ocean",
+                            "minecraft:deep_lukewarm_ocean", "minecraft:deep_ocean", "minecraft:deep_warm_ocean", "minecraft:desert", "minecraft:desert_hills",
+                            "minecraft:desert_mutated", "minecraft:dripstone_caves", "minecraft:extreme_hills", "minecraft:extreme_hills_edge",
+                            "minecraft:extreme_hills_mutated", "minecraft:extreme_hills_plus_trees", "minecraft:extreme_hills_plus_trees_mutated",
+                            "minecraft:flower_forest", "minecraft:forest", "minecraft:forest_hills", "minecraft:frozen_ocean", "minecraft:frozen_peaks",
+                            "minecraft:frozen_river", "minecraft:grove", "minecraft:hell", "minecraft:ice_mountains", "minecraft:ice_plains",
+                            "minecraft:ice_plains_spikes", "minecraft:jagged_peaks", "minecraft:jungle", "minecraft:jungle_edge", "minecraft:jungle_edge_mutated",
+                            "minecraft:jungle_hills", "minecraft:jungle_mutated", "minecraft:legacy_frozen_ocean", "minecraft:lukewarm_ocean", "minecraft:lush_caves",
+                            "minecraft:mangrove_swamp", "minecraft:meadow", "minecraft:mega_taiga", "minecraft:mega_taiga_hills", "minecraft:mesa",
+                            "minecraft:mesa_bryce", "minecraft:mesa_plateau", "minecraft:mesa_plateau_mutated", "minecraft:mesa_plateau_stone",
+                            "minecraft:mesa_plateau_stone_mutated", "minecraft:mushroom_island", "minecraft:mushroom_island_shore", "minecraft:ocean",
+                            "minecraft:pale_garden", "minecraft:plains", "minecraft:redwood_taiga_hills_mutated", "minecraft:redwood_taiga_mutated", "minecraft:river",
+                            "minecraft:roofed_forest", "minecraft:roofed_forest_mutated", "minecraft:savanna", "minecraft:savanna_mutated", "minecraft:savanna_plateau",
+                            "minecraft:savanna_plateau_mutated", "minecraft:snowy_slopes", "minecraft:soulsand_valley", "minecraft:stone_beach", "minecraft:stony_peaks",
+                            "minecraft:sulfur_caves", "minecraft:sunflower_plains", "minecraft:swampland", "minecraft:swampland_mutated", "minecraft:taiga",
+                            "minecraft:taiga_hills", "minecraft:taiga_mutated", "minecraft:the_end", "minecraft:warm_ocean", "minecraft:warped_forest"
+                        ]}
+                    ]
+                },
+                "structure": {
+                    "args": ["<structure: string>", "useNewChunksOnly: Boolean"],
+                    "completions": [
+                        {"type": "enum", "values": [
+                            "minecraft:ancient_city", "minecraft:bastion_remnant", "minecraft:buried_treasure", "minecraft:end_city", "minecraft:fortress",
+                            "minecraft:mansion", "minecraft:mineshaft", "minecraft:monument", "minecraft:pillager_outpost", "minecraft:ruined_portal",
+                            "minecraft:ruins", "minecraft:shipwreck", "minecraft:stronghold", "minecraft:temple", "minecraft:trail_ruins",
+                            "minecraft:trial_chambers", "minecraft:village"
+                        ]},
+                        {"type": "boolean"}
+                    ]
+                }
+            }
+        },
+        "loot": {
+            "args": ["<subcommand: see /help loot>"]
+        },
+        "mobevent": {
+            "args": ["<event: MobEvent>", "[value: Boolean]"],
+            "completions": [
+                {"type": "enum", "values": ["events_enabled", "minecraft:ender_dragon_event", "minecraft:pillager_patrols_event", "minecraft:wandering_trader_event"]},
+                {"type": "boolean"}
+            ]
+        },
+        "msg": {
+            "args": ["<player: target>", "<message: message>"],
+            "completions": [
+                {"type": "players"}
+            ]
+        },
+        "music": {
+            "args": ["<play|queue|stop|volume>"],
+            "completions": [{"type": "goto-children"}],
+            "children": {
+                "play": {
+                    "args": ["<trackName: string>", "[volume: float]", "[fadeSeconds: float]", "repeatMode: MusicRepeatMode"],
+                    "completions": [{"type": "skip"}, {"type": "skip"}, {"type": "skip"}, {"type": "enum", "values": ["loop", "play_once"]}]
+                },
+                "queue": {
+                    "args": ["<trackName: string>", "[volume: float]", "[fadeSeconds: float]", "repeatMode: MusicRepeatMode"],
+                    "completions": [{"type": "skip"}, {"type": "skip"}, {"type": "skip"}, {"type": "enum", "values": ["loop", "play_once"]}]
+                },
+                "stop": {
+                    "args": ["[fadeSeconds: float]"]
+                },
+                "volume": {
+                    "args": ["<volume: float>"]
+                }
+            }
         },
         "op": {
             "args": ["<player: target>"],
