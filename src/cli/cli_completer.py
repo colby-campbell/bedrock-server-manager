@@ -26,6 +26,8 @@ _CLI_COMMANDS_ARGS = {
     },
 }
 
+_TARGET_SELECTORS = ['@a', '@e', '@r']
+
 _BEDROCK_COMMANDS_FILE = "bedrock_commands.json"
 
 
@@ -124,8 +126,10 @@ class BedrockCompleter(Completer):
                     return # No completions for this argument
                 case 'goto-children':
                     goto_children = True
+                case 'boolean':
+                    candidates = ['true', 'false']
                 case 'players':
-                    candidates = self._get_players()
+                    candidates = _TARGET_SELECTORS + self._get_players()
                 case 'backups':
                     candidates = self._get_backups() + comp.get('extras', [])
                 case 'enum':
