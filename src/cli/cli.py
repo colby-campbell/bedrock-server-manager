@@ -96,6 +96,7 @@ class CommandLineInterface:
         # Starting print messages for CLI
         self.log_print("Type ':help' for a list of built-in commands.")
         self.log_print(f"Discord bot is {'ENABLED' if self.discord_bot else 'DISABLED'}")
+        self.log_print(self.automation.check_for_updates())
         # Main input loop
         while True:
             # Prompt for input
