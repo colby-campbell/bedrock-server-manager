@@ -115,8 +115,8 @@ class ServerRunner:
     def _read_stdout(self):
         """Internal method run in a separate thread to continuously read stdout lines from the server process and enqueue them for processing."""
         for line in self.process.stdout:
-            # Strip the newline from the line
-            line = line.rstrip()
+            # Strip whitespace and null characters from the line
+            line = line.replace("\x00", "").strip()
             # Detect and strip no log file prefix (this happens when the server is running two instances on the same port)
             if line.startswith("NO LOG FILE! - ["):
                 line = line[len("NO LOG FILE! - "):]
