@@ -477,6 +477,14 @@
                 }
             }
         },
+        "packstack": {
+            "args": ["<stackType: stackType>", "[verbose: verbose]", "[exclude-vanilla: exclude-vanilla]"],
+            "completions": [
+                {"type": "enum", "values": ["client", "server"]},
+                {"type": "enum", "values": ["verbose"]},
+                {"type": "enum", "values": ["exclude-vanilla"]}
+            ]
+        },
         "op": {
             "args": ["<player: target>"],
             "completions": [
