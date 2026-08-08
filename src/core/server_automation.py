@@ -1,5 +1,5 @@
 import requests
-from utils import BufferedDailyLogger, LineBroadcaster, custom_line, LogLevel, UpdateInfo, get_bedrock_update_info
+from utils import BufferedDailyLogger, LineBroadcaster, custom_line, LogLevel, get_bedrock_update_info
 from datetime import datetime, timedelta
 from pathlib import Path
 from time import sleep, strftime, time
