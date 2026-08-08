@@ -75,7 +75,7 @@ class BufferedDailyLogger:
 
         
     def _periodic_flush(self):
-        """Function that runs on a separate thread to periodically flush the """
+        """Function that runs on a separate thread to periodically flush the buffer to the log file"""
         while self.running:
             self._wait_event.wait(FLUSH_INTERVAL)
             with self.lock:

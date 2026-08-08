@@ -141,13 +141,16 @@ class ServerRunner:
                         "Please ensure that server.properties exists in the server folder and is properly configured."
                     )
                 )
-                self.send_command("")           # Since the server is looking for an input to continue, send an empty string to prevent it from hanging
-                self._expected_shutdown = True  # Prevent the unexpected shutdown message since we know why it happened
+                # Since the server is looking for an input to continue, send an empty string to prevent it from hanging
+                self.send_command("")
+                self._expected_shutdown = True
         # Clean up runner state after process exits
         self.process.stdout.close()
         self.process = None
         # If the shutdown was not expected, we alert all subscribers
         if not self._expected_shutdown:
+            # Ensure all queued stdout lines are dispatched before the shutdown message so log ordering stays correct
+            self.stdout_broadcaster.flush()
             self.unexpected_shutdown_broadcaster.publish(
                 *custom_line(LogLevel.ERROR, "The server has shut down unexpectedly.")
             )
