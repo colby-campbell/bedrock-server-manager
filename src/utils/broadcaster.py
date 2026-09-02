@@ -11,12 +11,12 @@ class LineBroadcaster:
         Args:
             on_error (callable, optional): A function to call when an error occurs during logging. It should accept a single argument, which is the error message. Defaults to None.
         """
+        self.on_error = on_error
         self.subscribers = []
         self._lock = threading.Lock()
         self._queue = queue.Queue()
         self._dispatch_thread = threading.Thread(target=self._dispatch_loop, daemon=True)
         self._dispatch_thread.start()
-        self.on_error = on_error
 
     def subscribe(self, callback):
         """
