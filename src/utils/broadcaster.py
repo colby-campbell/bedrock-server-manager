@@ -74,4 +74,4 @@ class LineBroadcaster:
                 except Exception as e:
                     # A subscriber failing cannot affect the broadcaster or other subscribers, so we catch and log the exception
                     if self.on_error:
-                        self.on_error(f"Error in subscriber callback {callback}: {e}")
+                        self.on_error(f"Error in subscriber callback {callback}: {str(e)}")

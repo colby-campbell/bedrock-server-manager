@@ -7,6 +7,7 @@ from .bedrock_download_link_fetcher import UpdateInfo, get_bedrock_update_info
 from .windows_job import create_job_object, close_job_object
 from .output import ServerOutput
 from .bedrock_downloader import download_and_extract_bedrock
+from .backup_error_logger import backup_error_log
 
 __all__ = [
     'BroadcastHandler',
@@ -23,5 +24,6 @@ __all__ = [
     'create_job_object',
     'close_job_object',
     'ServerOutput',
-    'download_and_extract_bedrock'
+    'download_and_extract_bedrock',
+    'backup_error_log'
 ]

@@ -1,5 +1,5 @@
 import requests
-from utils import BufferedDailyLogger, LineBroadcaster, custom_line, LogLevel, get_bedrock_update_info
+from utils import BufferedDailyLogger, LineBroadcaster, custom_line, LogLevel, get_bedrock_update_info, backup_error_log
 from datetime import datetime, timedelta
 from pathlib import Path
 from time import sleep, strftime, time
@@ -50,7 +50,7 @@ class ServerAutomation:
         # Create logger
         self.logger = BufferedDailyLogger(
             self.config.log_folder,
-            on_error=lambda msg: self.automation_output_broadcaster.publish(*custom_line(LogLevel.ERROR, f"Error writing to log file: {msg}"))
+            on_error=backup_error_log
         )
         self.recent_crashes = []
         self.current_version = None
