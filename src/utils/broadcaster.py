@@ -1,17 +1,17 @@
 import threading
 import queue
 from .format_helper import LogLevel
+from .backup_error_logger import backup_error_log
 
 
 class LineBroadcaster:
     """Class to broadcast server output lines to multiple subscribers via a background dispatch thread."""
-    def __init__(self, on_error = None):
+    def __init__(self):
         """
         Initialize the LineBroadcaster with an empty list of subscribers and start its background dispatch thread.
         Args:
             on_error (callable, optional): A function to call when an error occurs during logging. It should accept a single argument, which is the error message. Defaults to None.
         """
-        self.on_error = on_error
         self.subscribers = []
         self._lock = threading.Lock()
         self._queue = queue.Queue()
@@ -73,5 +73,4 @@ class LineBroadcaster:
                     callback(level, timestamp, message, line)
                 except Exception as e:
                     # A subscriber failing cannot affect the broadcaster or other subscribers, so we catch and log the exception
-                    if self.on_error:
-                        self.on_error(f"Error in subscriber callback {callback}: {str(e)}")
+                    backup_error_log(f"Error in subscriber callback {callback}: {str(e)}")

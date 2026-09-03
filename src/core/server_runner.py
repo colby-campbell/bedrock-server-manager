@@ -78,6 +78,9 @@ class ServerRunner:
                     # Load the C library and call prctl to set the parent death signal to SIGTERM
                     ctypes.CDLL("libc.so.6").prctl(1, signal.SIGTERM)
 
+            # On Windows, put the child in its own process group so a Ctrl+C doesn't kill bedrock_server.exe
+            creationflags = subprocess.CREATE_NEW_PROCESS_GROUP if self.platform == Platform.Windows else 0
+
             # Start the server process
             self.process = subprocess.Popen(
                 [executable_path],
@@ -87,8 +90,12 @@ class ServerRunner:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 universal_newlines=True,
+                encoding="utf-8",
                 bufsize=1,
                 preexec_fn=preexec_fn,
+                creationflags=creationflags,
+                # On Linux, detach into a new session/process group so a Ctrl+C doesn't kill bedrock_server.
+                start_new_session=True,
             )
 
             # On Windows, bind bedrock_server to a Job Object so it is killed when this process exits
