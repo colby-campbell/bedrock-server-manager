@@ -71,7 +71,7 @@ class ServerRunner:
             if not os.path.isfile(executable_path):
                 raise FileNotFoundError(f"{executable_path}: server executable not found")
 
-            # On Linux, instruct the kernel to send SIGTERM to bedrock_server if this process dies
+            # On Linux, instruct the kernel to send SIGTERM to bedrock_server if this process dies to avoid leaving orphaned server process
             preexec_fn = None
             if self.platform == Platform.Linux:
                 def preexec_fn():
@@ -98,7 +98,7 @@ class ServerRunner:
                 start_new_session=True,
             )
 
-            # On Windows, bind bedrock_server to a Job Object so it is killed when this process exits
+            # On Windows, bind bedrock_server to a Job Object so it is killed when this process exits to avoid leaving orphaned server process
             if self.platform == Platform.Windows:
                 # AssignProcessToJobObject requires a Win32 handle, not a PID: _handle is the internal handle Popen holds on Windows
                 self._job = create_job_object(int(self.process._handle))
@@ -161,8 +161,7 @@ class ServerRunner:
             self.unexpected_shutdown_broadcaster.publish(
                 *custom_line(LogLevel.ERROR, "The server has shut down unexpectedly.")
             )
-        # Clean up the
-        # Windows Job Object if it exists
+        # Clean up the Windows Job Object if it exists
         if self._job is not None:
             close_job_object(self._job)
             self._job = None

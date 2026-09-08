@@ -59,18 +59,22 @@ class LineBroadcaster:
         and act as an isolation layer between the broadcaster and the subscribers.
         """
         while True:
-            item = self._queue.get()
-            # If the item is a threading.Event, it is a signal that the queue has been flushed, so we unblock the flush() thread
-            if isinstance(item, threading.Event):
-                item.set()
-                continue
-            level, timestamp, message, line = item
-            # Create a shallow copy of the subscriber list to avoid issues if subscribers are added or removed during iteration
-            with self._lock:
-                callbacks = self.subscribers.copy()
-            for callback in callbacks:
-                try:
-                    callback(level, timestamp, message, line)
-                except Exception as e:
-                    # A subscriber failing cannot affect the broadcaster or other subscribers, so we catch and log the exception
-                    backup_error_log(f"Error in subscriber callback {callback}: {str(e)}")
+            try:
+                item = self._queue.get()
+                # If the item is a threading.Event, it is a signal that the queue has been flushed, so we unblock the flush() thread
+                if isinstance(item, threading.Event):
+                    item.set()
+                    continue
+                level, timestamp, message, line = item
+                # Create a shallow copy of the subscriber list to avoid issues if subscribers are added or removed during iteration
+                with self._lock:
+                    callbacks = self.subscribers.copy()
+                for callback in callbacks:
+                    try:
+                        callback(level, timestamp, message, line)
+                    except Exception as callback_exception:
+                        # A subscriber failing cannot affect the broadcaster or other subscribers, so we catch and log the exception
+                        backup_error_log(f"Error in subscriber callback {callback}: {str(callback_exception)}")
+            except Exception as dispatch_exception:
+                # Catch all exceptions to prevent the dispatch thread from crashing, and log the error
+                backup_error_log(f"Unexpected error in broadcaster dispatch loop: {str(dispatch_exception)}")
