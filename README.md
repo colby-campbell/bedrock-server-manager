@@ -1,6 +1,6 @@
 # Bedrock Server Manager
 
-A Python toolkit to automate, configure, and manage a Minecraft Bedrock Dedicated Server, with Discord integration, automated backups, and automatic updates.
+A Python server manager to automate, configure, and manage a Minecraft Bedrock Dedicated Server, with Discord integration, automated backups, and automatic updates.
 
 It is designed to work as-is; however, the modularity of the code allows for extensibility so people can expand upon it to add features they may want (e.g. a web application to manage the software).
 
