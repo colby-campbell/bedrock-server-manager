@@ -32,12 +32,6 @@ WORLDS_FOLDER_NAME = "worlds"
 class ServerAutomation:
     def __init__(self, config, runner):
         self.config = config
-        self.server_folder = config.server_folder
-        self.world_name = config.world_name
-        self.backup_folder = config.backup_folder
-        self.backup_duration = config.backup_duration
-        self.crash_limit = config.crash_limit
-        self.restart_time = config.restart_time
         self.runner = runner
         # Subscribe to the stdout broadcaster and unexpected shutdown broadcaster
         self.runner.stdout_broadcaster.subscribe(self.handle_server_output)
@@ -75,7 +69,7 @@ class ServerAutomation:
         scheduled_restart_thread = threading.Thread(target=self._scheduled_restart, daemon=True)
         scheduled_restart_thread.start()
         # Prune old backups on startup
-        self._prune_old_backups(Path(self.backup_folder))
+        self._prune_old_backups(Path(self.config.backup_folder))
 
 
     def handle_server_output(self, _level: LogLevel, _timestamp: str, message: str, line: str):
@@ -112,7 +106,7 @@ class ServerAutomation:
         # If any of the timestamps are older than the CRASH_DETECTION_WINDOW_MINUTES minutes, remove them
         self.recent_crashes = [t for t in self.recent_crashes if t >= crash_detection_window]
         # If the length is larger than the crash limit, send an error and do not restart the server
-        if len(self.recent_crashes) >= self.crash_limit:
+        if len(self.recent_crashes) >= self.config.crash_limit:
             self.log_print(LogLevel.CRITICAL, "Repeated unexpected shutdowns detected. Crash limit exceeded. Server restart attempts halted until manual intervention.")
         else:
             self.log_print(LogLevel.INFO, "Automatic restart triggered due to unexpected server shutdown.")
@@ -124,7 +118,7 @@ class ServerAutomation:
         while True:
             # Get current time and today's restart time
             now = datetime.now()
-            restart_date = now.replace(hour=self.restart_time[0], minute=self.restart_time[1], second=0, microsecond=0)
+            restart_date = now.replace(hour=self.config.restart_time[0], minute=self.config.restart_time[1], second=0, microsecond=0)
 
             # If today's restart time has passed, schedule for tomorrow
             if now >= restart_date:
@@ -220,7 +214,7 @@ class ServerAutomation:
             backup_root (Path): The root directory where backups are stored.
         """
         self.log_print(LogLevel.DEBUG, "Pruning old backups...")
-        cutoff_time = datetime.now() - timedelta(days=self.backup_duration)
+        cutoff_time = datetime.now() - timedelta(days=self.config.backup_duration)
         pruned = []
         for backup in backup_root.iterdir():
             try:
@@ -264,8 +258,8 @@ class ServerAutomation:
                 return None
             
             # Prepare paths to backup
-            world_dir = Path(self.server_folder) / WORLDS_FOLDER_NAME / self.world_name
-            backup_root = Path(self.backup_folder)
+            world_dir = Path(self.config.server_folder) / WORLDS_FOLDER_NAME / self.config.world_name
+            backup_root = Path(self.config.backup_folder)
             backup_root.mkdir(parents=True, exist_ok=True)
 
             timestamp = strftime(BACKUP_TIMESTAMP_FORMAT)
@@ -322,8 +316,8 @@ class ServerAutomation:
                 return None
 
             # Prepare paths to backup
-            world_dir = Path(self.server_folder) / WORLDS_FOLDER_NAME / self.world_name
-            backup_root = Path(self.backup_folder)
+            world_dir = Path(self.config.server_folder) / WORLDS_FOLDER_NAME / self.config.world_name
+            backup_root = Path(self.config.backup_folder)
             backup_root.mkdir(parents=True, exist_ok=True)
 
             timestamp = strftime(BACKUP_TIMESTAMP_FORMAT)
@@ -475,7 +469,7 @@ class ServerAutomation:
 
     def list_backups(self):
         """List existing backups in the backup directory."""
-        backup_root = Path(self.backup_folder)
+        backup_root = Path(self.config.backup_folder)
 
         backups = []
         if backup_root.exists() and backup_root.is_dir():
@@ -496,7 +490,7 @@ class ServerAutomation:
         Args:
             identifier (str): The name of the backup to mark, "latest" for the latest backup, or a date in YYYY-MM-DD format to mark all backups from that date.
         """
-        backup_root = Path(self.backup_folder)
+        backup_root = Path(self.config.backup_folder)
         if identifier.lower() == "latest":
             # Find the latest backup
             latest_backup = None
@@ -551,7 +545,7 @@ class ServerAutomation:
         Args:
             identifier (str): The name of the backup to unmark, "latest" for the latest backup, or a date in YYYY-MM-DD format to unmark all backups from that date.
         """
-        backup_root = Path(self.backup_folder)
+        backup_root = Path(self.config.backup_folder)
         if identifier.lower() == "latest":
             # Find the latest backup
             latest_backup = None
@@ -613,8 +607,8 @@ class ServerAutomation:
                 return "Cannot switch world while server is running."
 
             # Prepare paths
-            world_dir = Path(self.server_folder) / WORLDS_FOLDER_NAME / self.world_name
-            backup_path = Path(self.backup_folder) / backup_name
+            world_dir = Path(self.config.server_folder) / WORLDS_FOLDER_NAME / self.config.world_name
+            backup_path = Path(self.config.backup_folder) / backup_name
 
             # Check if the backup exists
             if not backup_path.exists():
@@ -687,9 +681,9 @@ class ServerAutomation:
                 return None
             
             # Prepare paths to backup
-            server_dir = Path(self.server_folder)
+            server_dir = Path(self.config.server_folder)
             server_dir.mkdir(parents=True, exist_ok=True)
-            backup_root = Path(self.backup_folder)
+            backup_root = Path(self.config.backup_folder)
             backup_root.mkdir(parents=True, exist_ok=True)
 
             timestamp = strftime(BACKUP_TIMESTAMP_FORMAT)
@@ -764,7 +758,7 @@ class ServerAutomation:
             download_path (Path): The path to the downloaded update zip file.
         """
         self.log_print(LogLevel.DEBUG, "Extracting update files to server folder...")
-        server_dir = Path(self.server_folder)
+        server_dir = Path(self.config.server_folder)
         try:
             with zipfile.ZipFile(download_path, 'r') as zf:
                 # Grab all files in the zip
@@ -824,7 +818,7 @@ class ServerAutomation:
                 return "Cannot update server while it is running."
             
             # Verify the current version is known before proceeding with an update
-            server_dir = Path(self.server_folder)
+            server_dir = Path(self.config.server_folder)
             if self.current_version is None:
                 self.log_print(LogLevel.ERROR, "Cannot check for updates: server version is unknown. Ensure the server has started successfully.")
                 return "Cannot check for updates: server version is unknown. Ensure the server has started successfully."

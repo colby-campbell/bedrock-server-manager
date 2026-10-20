@@ -17,9 +17,6 @@ class ServerRunner:
             config (ServerConfig): The server configuration instance.
         """
         self.config = config
-        self.server_folder = config.server_folder
-        self.shutdown_timeout = config.shutdown_timeout
-        self.platform = config.platform
         self.process = None
         self._warned_no_log_file = False
         self.stdout_broadcaster = LineBroadcaster()
@@ -60,20 +57,20 @@ class ServerRunner:
             # Grab the current environment and the working directory for the server executable
             env = os.environ.copy()
             # TODO: make better lol
-            cwd = os.path.abspath(self.server_folder)
+            cwd = os.path.abspath(self.config.server_folder)
 
-            if self.platform == Platform.Linux:
+            if self.config.platform == Platform.Linux:
                 # On Linux we have to set the correct library path environment
                 env["LD_LIBRARY_PATH"] = cwd
 
             # Verify that the server executable exists at the expected path
-            executable_path = os.path.join(cwd, "bedrock_server" if self.platform == Platform.Linux else "bedrock_server.exe")
+            executable_path = os.path.join(cwd, "bedrock_server" if self.config.platform == Platform.Linux else "bedrock_server.exe")
             if not os.path.isfile(executable_path):
                 raise FileNotFoundError(f"{executable_path}: server executable not found")
 
             # On Linux, instruct the kernel to send SIGTERM to bedrock_server if this process dies
             preexec_fn = None
-            if self.platform == Platform.Linux:
+            if self.config.platform == Platform.Linux:
                 def preexec_fn():
                     # Load the C library and call prctl to set the parent death signal to SIGTERM
                     ctypes.CDLL("libc.so.6").prctl(1, signal.SIGTERM)
@@ -92,7 +89,7 @@ class ServerRunner:
             )
 
             # On Windows, bind bedrock_server to a Job Object so it is killed when this process exits
-            if self.platform == Platform.Windows:
+            if self.config.platform == Platform.Windows:
                 # AssignProcessToJobObject requires a Win32 handle, not a PID: _handle is the internal handle Popen holds on Windows
                 self._job = create_job_object(int(self.process._handle))
 
@@ -189,7 +186,7 @@ class ServerRunner:
             self.send_command("stop")
             try:
                 # Wait for the process to exit gracefully
-                self.process.wait(timeout=self.shutdown_timeout)
+                self.process.wait(timeout=self.config.shutdown_timeout)
             except subprocess.TimeoutExpired:
                 # If the process does not exit in time, kill it
                 self.process.kill()

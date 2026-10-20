@@ -43,7 +43,6 @@ class CommandLineInterface:
             bot (DiscordBot): The Discord bot instance.
         """
         self.config = config
-        self.discord_bot = config.discord_bot
         self.runner = runner
         # Subscribe to the stdout broadcaster and unexpected shutdown broadcaster
         self.runner.stdout_broadcaster.subscribe(self.handle_server_output)
@@ -99,7 +98,7 @@ class CommandLineInterface:
         # Starting print messages for CLI
 
         self.log_print("Type ':help' for a list of built-in commands.")
-        self.log_print(f"Discord bot is {'ENABLED' if self.discord_bot else 'DISABLED'}")
+        self.log_print(f"Discord bot is {'ENABLED' if self.config.discord_bot else 'DISABLED'}")
         # Main input loop
         while True:
             # Prompt for input

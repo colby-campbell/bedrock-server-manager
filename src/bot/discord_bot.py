@@ -40,10 +40,7 @@ class DiscordBot:
             runner (ServerRunner): The server runner instance.
             automation (ServerAutomation): The server automation instance.
         """
-        self.admin_list = config.admins
-        self.token = config.bot_token
-        self.custom_commands = config.custom_commands
-        self.discord_debug = config.discord_debug
+        self.config = config
         self.runner = runner
         self.automation = automation
         self.broadcaster = LineBroadcaster()
@@ -85,14 +82,14 @@ class DiscordBot:
                 "`!switch <backup_name>` - Switch the world to the specified backup.",
                 "`!check` - Check for Bedrock server updates.",
                 "`!update` - Update the Bedrock server to the latest version.",
-                *[f"`!{c['name']}` - {c['description']}" for c in self.custom_commands if c["admin"]]
+                *[f"`!{c['name']}` - {c['description']}" for c in self.config.custom_commands if c["admin"]]
             ]
             embed.add_field(name="Admin Commands", value="\n".join(admin_lines), inline=False)
 
             general_lines = [
                 "`!help` - Show this message.",
                 "`!online` - Show who is online.",
-                *[f"`!{c['name']}` - {c['description']}" for c in self.custom_commands if not c["admin"]]
+                *[f"`!{c['name']}` - {c['description']}" for c in self.config.custom_commands if not c["admin"]]
             ]
             embed.add_field(name="General Commands", value="\n".join(general_lines), inline=False)
 
@@ -149,7 +146,7 @@ class DiscordBot:
                 self.runner.stdout_broadcaster.unsubscribe(on_server_output)
 
         # Admin commands
-        @is_admin(self.admin_list)
+        @is_admin(self.config.admins)
         @self.bot.command(name="start")
         async def discord_start(ctx):
             self.automation.log_print(LogLevel.INFO, f"!start invoked by {ctx.author}.")
@@ -160,7 +157,7 @@ class DiscordBot:
                 await asyncio.get_event_loop().run_in_executor(None, self.runner.start)
                 await ctx.send("Server started.")
 
-        @is_admin(self.admin_list)
+        @is_admin(self.config.admins)
         @self.bot.command(name="stop")
         async def discord_stop(ctx):
             self.automation.log_print(LogLevel.INFO, f"!stop invoked by {ctx.author}.")
@@ -171,7 +168,7 @@ class DiscordBot:
             else:
                 await ctx.send("Server is not running.")
 
-        @is_admin(self.admin_list)
+        @is_admin(self.config.admins)
         @self.bot.command(name="restart")
         async def discord_restart(ctx):
             self.automation.log_print(LogLevel.INFO, f"!restart invoked by {ctx.author}.")
@@ -183,7 +180,7 @@ class DiscordBot:
                 await ctx.send("Server is not running, starting server...")
                 await asyncio.get_event_loop().run_in_executor(None, self.runner.start)
 
-        @is_admin(self.admin_list)
+        @is_admin(self.config.admins)
         @self.bot.command(name="backup")
         async def discord_backup(ctx):
             self.automation.log_print(LogLevel.INFO, f"!backup invoked by {ctx.author}.")
@@ -191,28 +188,28 @@ class DiscordBot:
             result = await asyncio.get_event_loop().run_in_executor(None, self.automation.smart_backup)
             await ctx.send(result)
 
-        @is_admin(self.admin_list)
+        @is_admin(self.config.admins)
         @self.bot.command(name="list")
         async def discord_list(ctx):
             self.automation.log_print(LogLevel.INFO, f"!list invoked by {ctx.author}.")
             result = await asyncio.get_event_loop().run_in_executor(None, self.automation.list_backups)
             await ctx.send(result)
 
-        @is_admin(self.admin_list)
+        @is_admin(self.config.admins)
         @self.bot.command(name="mark")
         async def discord_mark(ctx, *, identifier: str):
             self.automation.log_print(LogLevel.INFO, f"!mark invoked by {ctx.author}.")
             result = self.automation.mark_backup(identifier)
             await ctx.send(result)
 
-        @is_admin(self.admin_list)
+        @is_admin(self.config.admins)
         @self.bot.command(name="unmark")
         async def discord_unmark(ctx, *, identifier: str):
             self.automation.log_print(LogLevel.INFO, f"!unmark invoked by {ctx.author}.")
             result = self.automation.unmark_backup(identifier)
             await ctx.send(result)
 
-        @is_admin(self.admin_list)
+        @is_admin(self.config.admins)
         @self.bot.command(name="switch")
         async def discord_switch(ctx, *, identifier: str):
             self.automation.log_print(LogLevel.INFO, f"!switch invoked by {ctx.author}.")
@@ -220,14 +217,14 @@ class DiscordBot:
             result = await asyncio.get_event_loop().run_in_executor(None, self.automation.switch_to_backup_world, identifier)
             await ctx.send(result)
 
-        @is_admin(self.admin_list)
+        @is_admin(self.config.admins)
         @self.bot.command(name="check")
         async def discord_check(ctx):
             self.automation.log_print(LogLevel.INFO, f"!check invoked by {ctx.author}.")
             result = await asyncio.get_event_loop().run_in_executor(None, self.automation.check_for_updates)
             await ctx.send(result)
 
-        @is_admin(self.admin_list)
+        @is_admin(self.config.admins)
         @self.bot.command(name="update")
         async def discord_update(ctx):
             self.automation.log_print(LogLevel.INFO, f"!update invoked by {ctx.author}.")
@@ -260,7 +257,7 @@ class DiscordBot:
                 await ctx.send(f"An error occurred, contact the server administrator.")
 
         # Register custom commands from config
-        for entry in self.custom_commands:
+        for entry in self.config.custom_commands:
             def make_handler(cmd_str, cmd_name, cmd_response):
                 async def handler(_ctx):
                     self.automation.log_print(LogLevel.INFO, f"!{cmd_name} invoked by {_ctx.author}.")
@@ -269,17 +266,17 @@ class DiscordBot:
                 return handler
             cmd = commands.Command(make_handler(entry["command"], entry["name"], entry["response"]), name=entry["name"], help=entry["description"])
             if entry["admin"]:
-                cmd.add_check(is_admin(self.admin_list).predicate)
+                cmd.add_check(is_admin(self.config.admins).predicate)
             self.bot.add_command(cmd)
 
         # Start the discord bot with custom logging
         self.running = True
         try:
             self.bot.run(
-                self.token,
+                self.config.bot_token,
                 log_handler=self.broadcast_handler,
                 log_formatter=self.log_formatter,
-                log_level=logging.DEBUG if self.discord_debug else logging.INFO
+                log_level=logging.DEBUG if self.config.discord_debug else logging.INFO
             )
         except Exception as e:
             self.automation.log_print(LogLevel.ERROR, f"Error starting Discord bot: {e}")
