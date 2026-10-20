@@ -83,6 +83,7 @@ class ServerConfig:
 
     crash_limit=3
     # Number of crashes within a period of 10 minutes before giving up restarting.
+    # Allowed Values: Any positive integer.
 
     restart_time="03:30"
     # Time to restart the server daily in HH:MM (24-hour) format.
@@ -293,6 +294,8 @@ class ServerConfig:
                 case self.SettingType.INTEGER:
                     if not isinstance(value, int):
                         errors.append(f"{name}: must be an integer")
+                    elif value < 1:
+                        errors.append(f"{name}: must be a positive integer")
                 case self.SettingType.BOOLEAN:
                     if not isinstance(value, bool):
                         errors.append(f"{name}: must be a boolean")
